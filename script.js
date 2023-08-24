@@ -6,6 +6,7 @@ var axises, cubeAxises, gCode, sTl;
 var plainTextFile = "tap,gcode,nc,mpt,mpf";
 var STL = "stl";
 var mark;
+var divider, dividerPos;
 // 创建球体对象
 var cursor3D = new THREE.Group();
 cursor3D.name = "cursor";
@@ -122,7 +123,139 @@ function disableKeyboardInput() {
     scene.removeEventListener('keydown', disableEvent, false);
     scene.removeEventListener('keyup', disableEvent, false);
 }
+//add screensize change listener
+window.addEventListener('resize', onWindowResize, false);
+function onWindowResize() {
+    // 调整渲染器大小
+    var aspect = window.innerWidth / window.innerHeight;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    cubeCamera.aspect = 1;
+    cubeCamera.updateProjectionMatrix();
+    cubeRenderer.setSize(150, 150);
+    cubeRenderer.render(cubeScene, cubeCamera);
+    cubeControls.update();
+}
 
+function bt_open() {
+    //pop open file diaglog to open local file accept extension in plainTextFile and STL
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = plainTextFile;//+ "," + STL;
+    fileInput.onchange = function (event) {
+        var file = event.target.files[0];
+        var reader = new FileReader();
+        reader.onload = function (event) {
+            var contents = event.target.result;
+            var extension = getFileExtension(file.name);
+            var type = plainTextFile.includes(extension) ? "GCODE" : STL.includes(extension) ? "STL" : "UNKNOWN"
+            loadModle(contents, type);
+            loadCode(contents, type);
+        };
+        reader.readAsBinaryString(file);
+    };
+    fileInput.click();
+
+}
+function bt_save() {
+    var blob = new Blob([txar.getValue()], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, "gcode.txt");
+}
+function gCodeClear() {
+    if (gCode != undefined) {
+        gCode.children.forEach(element => {
+            element.geometry.dispose();
+            element.material.dispose();
+        });
+        scene.remove(gCode);
+    }
+}
+function sTlClear() {
+    if (sTl != undefined) {
+        sTl.children.forEach(element => {
+            s.geometry.dispose();
+            element.material.dispose();
+        });
+        scene.remove(sTl);
+    }
+}
+function bt_clear() {
+    txar.setValue("");
+    gCodeClear();
+    sTlClear();
+}
+function bt_regenerate() {
+    var contents = txar.getValue();
+    gCodeClear();
+    sTlClear();
+    var type = "GCODE";
+    loadModle(contents, type);
+    loadCode(contents, type);
+}
+function bt_state() {
+    var state = document.getElementById('state');
+    if (state.innerHTML == "stateShow") {
+        state.innerHTML = "stateHide";
+        stats.dom.parentNode.style.display = "none";
+        document.getElementById('stats-container').style.display = "none";
+    } else {
+        state.innerHTML = "stateShow";
+        stats.dom.parentNode.style.display = "block";
+        document.getElementById('stats-container').style.display = "block";
+    }
+
+
+}
+function bt_codeviewer() {
+    var codeviewer = document.getElementById('codeViewer');
+
+    if (divider.style.left === "0%" || divider.style.left === "0px") {
+        divider.style.left = dividerPos;
+        codeviewer.style.width = dividerPos;
+    } else {
+        dividerPos = divider.style.left;
+        divider.style.left = "0%";
+        codeviewer.style.width = "0%";
+    }
+
+}
+function bt_fullscreen() {
+    var fullscreen = document.getElementById('fullscreen');
+    if (fullscreen.innerHTML == "fullscreen") {
+        fullscreen.innerHTML = "exit fullscreen";
+        var element = document.documentElement;
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+
+        } else if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+
+        }
+    } else {
+        fullscreen.innerHTML = "fullscreen";
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+
+        }
+    }
+}
+//add relative function end
 function init() {
     scene = new THREE.Scene();
     scene.add(cursor3D);
@@ -136,23 +269,23 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     var codeViewer = document.getElementById('codeViewer');
     codeViewer.style.position = 'absolute';
-    codeViewer.style.top = '0px';
+    codeViewer.style.top = '5vh';
     codeViewer.style.left = '0px';
-    codeViewer.style.width = '30%';
+    codeViewer.style.width = '20%';
     codeViewer.style.height = '100%';
     //codeViewer.style.border = '1px solid white';
     codeViewer.style.zIndex = '99';
 
-    var divider = document.getElementById('divider');
+    divider = document.getElementById('divider');
     divider.style.zIndex = '100';
     divider.style.position = 'absolute';
-    divider.style.top = '0px';
+    divider.style.top = '5vh';
     divider.style.left = codeViewer.style.width;
     divider.style.height = '100%';
     divider.style.width = '10px';
     var v = document.getElementById('3dViewer');
     v.style.position = 'absolute';
-    v.style.top = '0px';
+    v.style.top = '5vh';
     v.style.left = '0px';
 
     document.addEventListener('mousedown', function (e) {
@@ -161,7 +294,7 @@ function init() {
     document.addEventListener('mousemove', function (e) {
         if (!isDragging) return;
         document.getElementById('divider').style.left = e.x + 'px';
-        console.log("left = " + e.x);
+        //console.log("left = " + e.x);
         document.getElementById('codeViewer').style.width = e.x + 'px';
     });
 
@@ -218,7 +351,12 @@ function init() {
     // var planeGeometry = new THREE.PlaneGeometry(250, 250);
     // var plane = new THREE.Mesh(planeGeometry, planeMaterial);
     // axises.add(plane);
-
+    var size = 250;
+    var divisions = 25;
+    var gridHelper = new THREE.GridHelper(size, divisions);
+    // 将网格旋转90度，使其位于xy平面上
+    gridHelper.rotation.x = Math.PI / 2;
+    axises.add(gridHelper);
 
     // 创建X轴线
     var xAxisGeometry = new THREE.Geometry();
@@ -339,10 +477,22 @@ function init() {
     var cubeZAxis = new THREE.Line(cubeZAxisGeometry, cubeZAxisMaterial);
     cubeAxises.add(cubeZAxis);
     cubeScene.add(cubeAxises);
-
+    initMenu();
     initStats();
     initControl();
 }
+function initMenu() {
+    var menu = document.getElementById('menu');
+    menu.style.position = 'absolute';
+    menu.style.top = '0px';
+    menu.style.left = '0px';
+    menu.style.width = '100%';
+    menu.style.background = 'rgba(0,0,0,1)';
+    menu.style.border = '1px solid white';
+    menu.style.zIndex = '100';
+
+}
+
 //创建一个名为createTextTexture()的函数，用于创建包含文本的纹理。
 function createTextTexture(text) {
     var canvas = document.createElement('canvas');
@@ -356,7 +506,6 @@ function createTextTexture(text) {
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText(text, canvas.width / 2, canvas.height / 2);
-
     var texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
 
@@ -367,8 +516,9 @@ function initStats() {
     stats = new Stats();
     var statsContainer = document.createElement('div');
     statsContainer.id = 'stats-container';
+    statsContainer.name = 'stats-container';
     statsContainer.style.position = 'absolute';
-    statsContainer.style.top = '0px';
+    statsContainer.style.top = '5vh';
     statsContainer.style.right = '0px';
     document.body.appendChild(statsContainer);
     statsContainer.appendChild(stats.dom);
@@ -440,44 +590,7 @@ function loadModle(contents, type) {
     }
     else { return; }
 
-    /*
-    
-        // 计算模型的包围盒
-        var boundingBox = new THREE.Box3().setFromObject(gCode || sTl);
-    
-        // 计算包围盒的中心点
-        var center = new THREE.Vector3();
-        boundingBox.getCenter(center);
-    
-        // 计算包围盒的最大边长
-        var size = new THREE.Vector3();
-        boundingBox.getSize(size);
-        var maxDim = Math.max(size.x, size.y, size.z);
-    
-        // 调整摄像机位置和缩放
-        camera.position.copy(center);
-        camera.position.z += maxDim * 2; // 调整摄像机距离模型的距离
-        CamZ = camera.position.z;
-        CamY = camera.position.y;
-        CamX = camera.position.x;
-    
-        //cubeCamX = cubeCamera.position.x;
-        //cubeCamY = cubeCamera.position.y;
-        //cubeCamZ = cubeCamera.position.z;
-    
-        var angle = Math.PI / 4; // 45度的弧度值
-        camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-        camera.lookAt(center);
-        camera.zoom = 1; // 重置摄像机缩放
-        camera.updateProjectionMatrix();
-    
-        // 调整渲染器大小
-        var aspect = window.innerWidth / window.innerHeight;
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        camera.aspect = aspect;
-        camera.updateProjectionMatrix();
-        cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
-        cubeCamera.lookAt(0, 0, 0);*/
+    autoMagnify();
 }
 function loadCode(contents, type) {
     txar.setValue(contents);
@@ -646,7 +759,6 @@ function parseGcode(contents) {
 
 cubeRenderer.domElement.addEventListener('dblclick', function (event) {
     resetView();
-
 });
 
 function resetView() {
@@ -660,6 +772,49 @@ function resetView() {
     camera.updateProjectionMatrix();
     initControl();
 }
+renderer.domElement.addEventListener('dblclick', function (event) {
+    autoMagnify();
+});
+function autoMagnify() {
+
+    // 计算模型的包围盒
+    var boundingBox = new THREE.Box3().setFromObject(gCode || sTl);
+
+    // 计算包围盒的中心点
+    var center = new THREE.Vector3();
+    boundingBox.getCenter(center);
+
+    // 计算包围盒的最大边长
+    var size = new THREE.Vector3();
+    boundingBox.getSize(size);
+    var maxDim = Math.max(size.x, size.y, size.z);
+
+    // 调整摄像机位置和缩放
+    camera.position.copy(center);
+    camera.position.z += maxDim * 2; // 调整摄像机距离模型的距离
+    CamZ = camera.position.z;
+    CamY = camera.position.y;
+    CamX = camera.position.x;
+
+    //cubeCamX = cubeCamera.position.x;
+    //cubeCamY = cubeCamera.position.y;
+    //cubeCamZ = cubeCamera.position.z;
+
+    var angle = Math.PI / 4; // 45度的弧度值
+    camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    camera.lookAt(center);
+    camera.zoom = 1; // 重置摄像机缩放
+    camera.updateProjectionMatrix();
+
+    // 调整渲染器大小
+    var aspect = window.innerWidth / window.innerHeight;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
+    cubeCamera.lookAt(0, 0, 0);
+}
+
 
 //同步转动
 controls.addEventListener('change', function (event) {
@@ -771,9 +926,9 @@ function onClick(event) {
                                 && Math.abs(vertex.z - z) <= delta
                             ) {
                                 console.log(vertex.name);
-                                console.log("abs(x:" + vertex.x+"-p.x:"+x +")="+Math.abs(vertex.x - x));
-                                console.log("abs(y:" + vertex.y+"-p.y:"+y +")="+Math.abs(vertex.y - y));
-                                console.log("abs(z:" + vertex.z+"-p.z:"+z +")="+Math.abs(vertex.z - z));
+                                console.log("abs(x:" + vertex.x + "-p.x:" + x + ")=" + Math.abs(vertex.x - x));
+                                console.log("abs(y:" + vertex.y + "-p.y:" + y + ")=" + Math.abs(vertex.y - y));
+                                console.log("abs(z:" + vertex.z + "-p.z:" + z + ")=" + Math.abs(vertex.z - z));
                                 if (vertex.name != undefined) {
                                     var lineNumber = parseInt(vertex.name.substring(1));
                                     codeLines.push(lineNumber);

@@ -24,23 +24,38 @@
         }
     </style>
 </head>
+<!-- no scolling -->
+<!-- <body style="overflow: hidden;"> -->
 
-<body>
+
+<body style="overflow: hidden;">
+<div id="menu" style="height: 5vh; width: 100vh;">
+<!-- add link: codeviewer, state, open, save, clear, regenerate-->
+    <button id="open" onclick="bt_open()">open</button>
+    <!-- <button id="save" onclick="bt_save()">save</button> -->
+    <button id="clear" onclick="bt_clear()">clear</button>
+    <button id="regenerate" onclick="bt_regenerate()">regenerate</button>
+    <button id="state" onclick="bt_state()">stateShow</button>
+    <button id="codeviewer" onclick="bt_codeviewer()">codeviewer</button>
+    <button id="fullscreen" onclick="bt_fullscreen()">fullscreen</button>
+
+
+
+</div>
+    <div>
     <div id="3dViewer"></div>
-    <div id="codeViewer">
-        <div id="codeEditor" style="height: 70%;">
-            <textarea id='txar'>code will be displaied here</textarea>
-            <!-- <pre id='txar'>code will be displaied here</pre> -->
-        </div>
-
-        <div id="cordinates" style="
+    <div id="cordinates" style="
         color: antiquewhite;  
         display: flex; 
-        background:black; 
-        border: 1px solid white; 
+        /* background:black;  */
+        /* border: 1px solid white;  */
         height: 30%;
         flex-direction: column;
         justify-content: space-evenly;
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 10%;
         ">
             <div id="x">X: 0</div>
             <div id="y">Y: 0</div>
@@ -48,11 +63,17 @@
             <div id="e">E: 0</div>
             <div id="a">A: 0</div>
         </div>
+    <div id="codeViewer" >
+        <div id="codeEditor" style="height: 95vh;">
+            <textarea id='txar'>code will be displaied here</textarea>
+            <!-- <pre id='txar'>code will be displaied here</pre> -->
+        </div>
     </div>
     <div id="divider" style="
     cursor: col-resize;
     background-color: rgba(128,128,128,0.5);
     "></div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
     <script src="https://cdn.rawgit.com/mrdoob/three.js/r110/examples/js/loaders/STLLoader.js"></script>
     <script src="OrbitControls.js"></script>
