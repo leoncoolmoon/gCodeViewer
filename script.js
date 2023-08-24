@@ -255,6 +255,147 @@ function bt_fullscreen() {
         }
     }
 }
+var direction = 1;
+//timmer
+var gcodeTimer = {
+    intervalId: null,
+    startTime: null,
+    elapsedTime: 0,
+
+    start: function() {
+        if (this.intervalId) {
+            console.log("Timer is already running.");
+            return;
+        }
+        this.startTime = Date.now();
+        this.intervalId = setInterval(function() {
+            var currentTime = Date.now();
+            this.elapsedTime += currentTime - this.startTime;
+            this.startTime = currentTime;
+            console.log("Elapsed time: " + this.elapsedTime + " ms");
+            var cursor = txar.getCursor();
+            var lineNumber = cursor.line;
+            if (direction == 1 && lineNumber < txar.lineCount() - 1) {
+                markLine(lineNumber + direction, true);
+            } else if (direction == -1 && lineNumber > 0) {
+                markLine(lineNumber +direction, true);
+            } else {
+                gcodeTimer.pause();
+            }
+                
+        }.bind(this), 100);
+    },
+
+    pause: function() {
+        if (!this.intervalId) {
+            console.log("Timer is not running.");
+            return;
+        }
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    }
+};
+
+
+
+function play_pause() {
+//start play
+//start a timer to move cursor based on the gcode
+var play_pause = document.getElementById('play');
+var back_pause = document.getElementById('back');
+back_pause.innerHTML = "back";
+if(play_pause.innerHTML ==="play"){
+    play_pause.innerHTML = "pause";
+    direction = 1;
+    gcodeTimer.start();
+}else{
+    play_pause.innerHTML = "play";
+    gcodeTimer.pause();
+}
+//pause play
+//stop timer
+
+}
+function back_pause() {
+//start back
+//start a timer to move cursor based on the gcode
+var back_pause = document.getElementById('back');
+var play_pause = document.getElementById('play');
+play_pause.innerHTML = "play";
+if(back_pause.innerHTML === "back"){
+    back_pause.innerHTML = "pause";
+    direction = -1;
+    gcodeTimer.start();
+}else{
+    back_pause.innerHTML = "back";
+    gcodeTimer.pause();
+}
+//pause back
+//stop timer
+
+}
+
+function bt_simulate(){
+    if(gCode === undefined){
+        alert("no gcode loaded");
+        return;
+    }
+    var toolDiameter = parseFloat(document.getElementById('toolDiameter').value);
+    var tooType = document.getElementById('toolType').value;
+    if(tooType === "remove"){
+    //CNC
+    var cnc = new THREE.Group();
+//use the boundaray of the gcode to draw a 0.5 transparent white box
+    // 计算模型的包围盒
+    var boundingBox = new THREE.Box3().setFromObject(gCode );
+    // 创建白色mash材质
+    var material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+    // 创建包围盒模型
+    var box = new THREE.Mesh(new THREE.BoxGeometry(boundingBox.max.x - boundingBox.min.x, boundingBox.max.y - boundingBox.min.y, boundingBox.max.z - boundingBox.min.z), material);
+    // 设置包围盒模型的位置
+    box.position.set((boundingBox.max.x + boundingBox.min.x) / 2, (boundingBox.max.y + boundingBox.min.y) / 2, (boundingBox.max.z + boundingBox.min.z) / 2);
+    // 将包围盒模型添加到场景中
+    cnc.add(box);
+var h = boundingBox.max.z - boundingBox.min.z;
+//创造以toolDamteter为半径的圆柱体
+var cylinderGeometry = new THREE.CylinderGeometry(toolDiameter/2, toolDiameter/2, h, 32);
+var middleShape = new THREE.Shape();
+middleShape.moveTo(0, 0);
+middleShape.lineTo(0, h);
+middleShape.lineTo(toolDiameter, h);
+middleShape.lineTo(toolDiameter, 0);
+middleShape.lineTo(0, 0);
+var extrudeSettings = {
+    steps: 100,
+    bevelEnabled: false,
+    extrudePath: gCode.children[1]
+};
+var extrudeGeometry = new THREE.ExtrudeGeometry(middleShape, extrudeSettings);
+var cut = new THREE.Mesh(extrudeGeometry, new THREE.MeshBasicMaterial({ color: 0x000000 }));
+cnc.add(cut);
+gCode.children[3].forEach(element => {
+    cylinderGeometry.setPosition(element.x, element.y, element.z);
+    cnc.add(new THREE.Mesh(cylinderGeometry, new THREE.MeshBasicMaterial({ color: 0x000000 })));
+    });
+scene.add(cnc);}
+else if(tooType === "add"){
+    //3dprinter
+    var curve = gCode.children[1];
+    var circleShape = new THREE.Shape();
+    circleShape.absarc(0, 0,toolDiameter, 0, Math.PI * 2, false);
+    var extrudeSettings = {
+        steps: 100,
+        bevelEnabled: false,
+        extrudePath: curve
+    };
+
+ // 创建挤出几何体
+ var extrudeGeometry = new THREE.ExtrudeGeometry(circleShape, extrudeSettings);
+ // 创建网格并添加到场景中
+ var prints = new THREE.Mesh(extrudeGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5  }));
+scene.add(prints);
+}
+}
 //add relative function end
 function init() {
     scene = new THREE.Scene();
@@ -490,6 +631,7 @@ function initMenu() {
     menu.style.background = 'rgba(0,0,0,1)';
     menu.style.border = '1px solid white';
     menu.style.zIndex = '100';
+    menu.style.color = 'white';
 
 }
 
@@ -615,81 +757,7 @@ function parseSTL(contents) {
     var geometry = new THREE.STLLoader().parse(contents);
     return geometry;
 }
-// function parseGcode(contents) {
-//     var lines = contents.split('\n');
 
-//     var geometry = new THREE.Geometry();
-
-//     var x = 0, y = 0, z = 0;
-
-//     for (var i = 0; i < lines.length; i++) {
-//         var line = lines[i].trim();
-
-//         if (line.startsWith('G')) {
-//             var parts = line.split(' ');
-//             for (var j = 0; j < parts.length; j++) {
-//                 var part = parts[j];
-//                 if (part.startsWith('X')) {
-//                     x = parseFloat(part.substring(1));
-//                 } else if (part.startsWith('Y')) {
-//                     y = parseFloat(part.substring(1));
-//                 } else if (part.startsWith('Z')) {
-//                     z = parseFloat(part.substring(1));
-//                 }
-//             }
-
-//             geometry.vertices.push(new THREE.Vector3(x, y, z));
-
-//         }
-//     }
-
-//     return geometry;
-// }
-
-// function parseGcode(contents) {
-//     var lines = contents.split('\n');
-
-//     var geometries = new THREE.Group();
-
-//     var x = 0, y = 0, z = 0;
-//     var g0Geometry = new THREE.Geometry(); // g0路径的几何体
-//     var g1Geometry = new THREE.Geometry(); // g1路径的几何体
-
-//     for (var i = 0; i < lines.length; i++) {
-//         var line = lines[i].trim();
-
-//         if (line.startsWith('G')) {
-//             var parts = line.split(' ');
-//             for (var j = 0; j < parts.length; j++) {
-//                 var part = parts[j];
-//                 if (part.startsWith('X')) {
-//                     x = parseFloat(part.substring(1));
-//                 } else if (part.startsWith('Y')) {
-//                     y = parseFloat(part.substring(1));
-//                 } else if (part.startsWith('Z')) {
-//                     z = parseFloat(part.substring(1));
-//                 }
-//             }
-//              if (line.startsWith('G0')) {
-//                 g0Geometry.vertices.push(new THREE.Vector3(x, y, z));
-
-//             }else if (line.startsWith('G1')) {
-//                 g1Geometry.vertices.push(new THREE.Vector3(x, y, z));
-//             } 
-//         }
-//     }
-//     if (g0Geometry.vertices.length > 0) {
-//         var line0=new THREE.LineSegments(g0Geometry);
-//         line0.name="g0";
-//         geometries.add(line0);
-//     }
-//     if (g1Geometry.vertices.length > 0) {
-//         var line1=new THREE.LineSegments(g1Geometry);
-//         line1.name="g1";
-//         geometries.add(line1);
-//     }
-//     return geometries;
-// }
 function parseGcode(contents) {
     var lines = contents.split('\n');
 
@@ -796,10 +864,6 @@ function autoMagnify() {
     CamY = camera.position.y;
     CamX = camera.position.x;
 
-    //cubeCamX = cubeCamera.position.x;
-    //cubeCamY = cubeCamera.position.y;
-    //cubeCamZ = cubeCamera.position.z;
-
     var angle = Math.PI / 4; // 45度的弧度值
     camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     camera.lookAt(center);
@@ -848,49 +912,7 @@ function onMouseMove(event) {
     //console.log("x=" + mouse.x + " y=" + mouse.y);
 }
 
-// function onClick(event) {
 
-//     // 更新射线投射器的起点和方向
-//     raycaster.setFromCamera(mouse, camera);
-
-//     // 计算与射线相交的物体
-//     var intersects = raycaster.intersectObjects(scene.children, true);
-//     if (gCode == undefined) return;
-//     // 如果有相交的物体
-//     if (intersects.length > 0) {
-//         intersects.forEach(intersect => {
-//             if (intersect.object.type == "Points") {
-//                 var delta = 0.001;
-//                 var x = intersect.point.x;
-//                 var y = intersect.point.y;
-//                 var z = intersect.point.z;
-//                 var uuid = intersect.object.uuid;
-//                 if (mark !== undefined) {
-//                     mark.clear();
-//                 } gCode.children.forEach(child => {
-//                     if (child.uuid == uuid) {
-//                         child.geometry.vertices.forEach(vertex => {
-//                             if (vertex.x - x <= delta && vertex.y - y <= delta && vertex.z - z <= delta) {
-//                                 console.log(vertex.name);
-//                                 if (vertex.name != undefined) {
-//                                     var lineNumber = parseInt(vertex.name.substring(1));
-//                                     markLine(lineNumber, true)
-//                                     return;
-//                                 }
-
-//                             }
-//                         });
-//                     }
-//                 });
-//             }else{
-//                 if (mark !== undefined) {
-//                     mark.clear();
-//                 }
-//                 cursor3D.visible = false;
-//             }
-//         });
-//     }
-// }
 var oldLineNum = 0;
 function onClick(event) {
     // 更新射线投射器的起点和方向
