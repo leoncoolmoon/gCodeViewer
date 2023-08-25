@@ -116,6 +116,7 @@ function fxisolationMode() {
     var selection = txar.getSelection();
     if (selection.length == 0) {
         return;
+    }
     var lines = selection.split('\n');
     if (lines.length > 1 && type === "GCODE") {
         isolateMode = true;
