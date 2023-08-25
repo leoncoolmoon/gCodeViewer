@@ -81,17 +81,86 @@ function getCordinats(line) {
     document.getElementById('e').innerHTML = "E:" + e;
     document.getElementById('a').innerHTML = "A:" + a;
 
-    return new THREE.Vector3(x, y, z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
+    //return new THREE.Vector3(x, y, z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
+    return { x: x, y: y, z: z, e: e, a: a };
 }
-
+var isolateMode = false;
 txar.on("cursorActivity", function () {
     var cursor = txar.getCursor();
     var lineNumber = cursor.line;// + 1; // 行号从0开始，所以需要加1
     markLine(lineNumber, false);
     // 将球体添加到场景中
-
 });
 
+
+
+var timer;
+txar.on("keyup", function (txar, event) {
+    if (event.key === "Shift") {
+        // set a timmer delay here if in 1000ms shift key is not pressed then enter the isolation mode       
+        filterCmd();
+      console.log("Shift key was released");
+    }
+  });
+  function filterCmd(){
+    if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(function() {
+        fxisolationMode();
+        console.log("执行指令");
+      }, 1000);
+
+  }
+function fxisolationMode() {
+    var selection = txar.getSelection();
+    if (selection.length == 0) {
+        return;
+    var lines = selection.split('\n');
+    if (lines.length > 1 && type === "GCODE") {
+        isolateMode = true;
+        gCodeClear();
+        cursor3D.visible = false;
+        var startLine = txar.getCursor("from").line;
+        var endLine = txar.getCursor("to").line;
+        var cord = getCordinats(startLine);
+        var lineContent = "";
+        for (var i = startLine; i <= endLine; i++) {
+            lineContent = lineContent + '\n'+ txar.getLine(i);
+        }
+            gCode = parseGcode(lineContent, cord.x, cord.y, cord.z, cord.e, cord.a);
+            var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
+            var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
+           try{ gCode.children[0].material = g0Material;}catch(e){}
+            try{gCode.children[1].material = g1Material;}catch(e){}
+            //add points
+            //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
+            var pMaterial = new THREE.PointsMaterial({
+                color: 0x000099,
+                size: 5,
+                sizeAttenuation: false, // 禁用点的大小自动衰减
+                alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
+                opacity: 0.75, // 设置透明度
+                transparent: true // 开启透明度
+            });
+           try{ var point0 = new THREE.Points(gCode.children[0].geometry, pMaterial);
+            point0.name = "g0points";
+            gCode.add(point0);}catch(e){};
+
+           try{ var point1 = new THREE.Points(gCode.children[1].geometry, pMaterial);
+            point1.name = "g1points";
+            gCode.add(point1);}catch(e){};
+
+            scene.add(gCode);
+        
+    } else {
+        if(isolateMode){
+            gCodeClear();
+            loadModle(txar.getValue(), type);
+            isolateMode = false;
+        }
+    }
+}
 function markLine(lineNumber, fromViewer) {
     if (fromViewer) {
         if (oldLineNum > lineNumber) {
@@ -100,7 +169,8 @@ function markLine(lineNumber, fromViewer) {
             txar.setCursor(lineNumber, 0);
         }
     }
-    var center = getCordinats(lineNumber);
+    var locArray = getCordinats(lineNumber);
+    var center = new THREE.Vector3(locArray.x, locArray.y, locArray.z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), locArray.a);
     if (center === undefined) {
         return;
     }
@@ -456,203 +526,206 @@ function init() {
         if (e.target.id === 'divider') {
             divider.style.background = 'rgba(64,128,200,0.5)';
         } else {
-            if (!isDragging) { 
-            divider.style.background = 'rgba(128,128,128,0.5)';
+            if (!isDragging) {
+                divider.style.background = 'rgba(128,128,128,0.5)';
+            }
         }
-    }
         if (!isDragging) return;
-    document.getElementById('divider').style.left = e.x + 'px';
-    //console.log("left = " + e.x);
-    document.getElementById('codeViewer').style.width = e.x + 'px';
-    //检查鼠标是否移出了目标元素
-    var rect = e.target.getBoundingClientRect();
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-        //console.log('Mouse moved out of target');
+        document.getElementById('divider').style.left = e.x + 'px';
+        //console.log("left = " + e.x);
+        document.getElementById('codeViewer').style.width = e.x + 'px';
+        //检查鼠标是否移出了目标元素
+        var rect = e.target.getBoundingClientRect();
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+            //console.log('Mouse moved out of target');
+            isDragging = false;
+            supressMain = false;
+            supressCube = false;
+            divider.style.background = 'rgba(128,128,128,0.5)';
+
+        }
+    });
+
+    document.addEventListener('mouseup', function (e) {
         isDragging = false;
         supressMain = false;
         supressCube = false;
         divider.style.background = 'rgba(128,128,128,0.5)';
+        //txar.on("mouseup",fxisolationMode);
+        if(e.target.className.includes("CodeMirror")){
+            fxisolationMode();
+        }
+    });
 
+
+
+    document.body.appendChild(renderer.domElement);
+    // 添加环境光和点光
+    var ambientLight = new THREE.AmbientLight(0xffffff);
+    scene.add(ambientLight);
+
+    var pointLight = new THREE.PointLight(0xffffff);
+    pointLight.position.set(500, 500, 500);
+    scene.add(pointLight);
+
+
+    // 监听拖放事件
+    window.addEventListener('dragover', function (event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+    });
+
+    window.addEventListener('drop', function (event) {
+        event.preventDefault();
+        read_file(event.dataTransfer.files[0]);
+    });
+
+
+    //在scene显示坐标系
+    var coneGeometry = new THREE.ConeGeometry(1, 2, 4); // 参数分别为底面半径、高度和分段数
+    axises = new THREE.Group();
+    axises.name = "ViewerAxises";
+    //创建一个立方体框架
+    var cubeGeometry = new THREE.BoxGeometry(250, 250, 250);
+    var edges = new THREE.EdgesGeometry(cubeGeometry);
+    var cubeMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
+    var cube = new THREE.LineSegments(edges, cubeMaterial);
+    cube.position.set(0, 0, 125);
+    axises.add(cube);
+
+    // var planeMaterial = new THREE.MeshBasicMaterial({ color: 0x888822, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+    // var planeGeometry = new THREE.PlaneGeometry(250, 250);
+    // var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    // axises.add(plane);
+    var size = 250;
+    var divisions = 25;
+    var gridHelper = new THREE.GridHelper(size, divisions);
+    // 将网格旋转90度，使其位于xy平面上
+    gridHelper.rotation.x = Math.PI / 2;
+    axises.add(gridHelper);
+
+    // 创建X轴线
+    var xAxisGeometry = new THREE.Geometry();
+    xAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    xAxisGeometry.vertices.push(new THREE.Vector3(10, 0, 0));
+    var xAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    var xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
+    axises.add(xAxis);
+    //创建X轴箭头
+    var coneXMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    var coneXMesh = new THREE.Mesh(coneGeometry, coneXMaterial);
+    coneXMesh.position.set(10, 0, 0);
+    coneXMesh.rotation.set(0, 0, -Math.PI / 2);
+    axises.add(coneXMesh);
+
+    // 创建Y轴线
+    var yAxisGeometry = new THREE.Geometry();
+    yAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    yAxisGeometry.vertices.push(new THREE.Vector3(0, 10, 0));
+    var yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    var yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
+    axises.add(yAxis);
+    //创建Y轴箭头
+    var coneYMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    var coneYMesh = new THREE.Mesh(coneGeometry, coneYMaterial);
+    coneYMesh.position.set(0, 10, 0);
+    axises.add(coneYMesh);
+
+    // 创建Z轴线
+    var zAxisGeometry = new THREE.Geometry();
+    zAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    zAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 10));
+    var zAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+    var zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
+    axises.add(zAxis);
+    //创建Z轴箭头
+    var coneZMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+    var coneZMesh = new THREE.Mesh(coneGeometry, coneZMaterial);
+    coneZMesh.position.set(0, 0, 10);
+    coneZMesh.rotation.set(Math.PI / 2, 0, 0);
+    axises.add(coneZMesh);
+
+    scene.add(axises);
+
+
+    // 视角控制器
+    //创建一个用于显示小立方体的HTML元素，并将其添加到页面的适当位置。为了在右上角显示，并设置合适的top和right样式属性。
+    cubeContainer = document.createElement('div');
+    cubeContainer.id = 'cube-container';
+    cubeContainer.style.position = 'absolute';
+    cubeContainer.style.top = '10px';
+    cubeContainer.style.right = '10px'
+    cubeContainer.style.width = '150px';
+    cubeContainer.style.height = '150px';
+    //cubeContainer.style.border = '1px solid white';
+    document.body.appendChild(cubeContainer);
+
+    cubeRenderer = new THREE.WebGLRenderer({ alpha: true });
+    cubeRenderer.setSize(150, 150);
+    cubeContainer.appendChild(cubeRenderer.domElement);
+
+    //创建一个THREE.Scene用于放置小立方体，并创建一个THREE.PerspectiveCamera用于观察这个场景。
+    cubeScene = new THREE.Scene();
+    //cubeScene.background = new THREE.Color(0x888888);
+    cubeCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+
+    cubeCamera.position.set(0, -15, 15);
+    cubeCamera.lookAt(0, 0, 0);
+    cubeCamera.up = new THREE.Vector3(0, 0, 1);
+
+
+
+    cubeAxises = new THREE.Group();
+    cubeAxises.name = "cubeAxises";
+    //创建一个THREE.CubeGeometry用于创建小立方体的各个面，并将其添加到场景中。
+    var faceNames = ["front", "back", "left", "right", "top", "bottom"];
+    var faceColors = [0xff0000, 0x0000ff, 0x00ff00, 0xffff00, 0xff00ff, 0x00ffff];
+    var cubeMaterials = [];
+    for (var i = 0; i < faceNames.length; i++) {
+        var material = new THREE.MeshBasicMaterial({ color: faceColors[i], transparent: true, opacity: 0.5 });
+        var textTexture = createTextTexture(faceNames[i]);
+        material.map = textTexture;
+        cubeMaterials.push(material);
     }
-});
 
-document.addEventListener('mouseup', function (e) {
-    isDragging = false;
-    supressMain = false;
-    supressCube = false;
-    divider.style.background = 'rgba(128,128,128,0.5)';
+    //创建一个THREE.WebGLRenderer用于渲染小立方体，并将其添加到页面的适当位置。
+    var cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
+    cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterials);
 
-});
+    var cubeambientLight = new THREE.AmbientLight(0xffffff);
+    var cubepointLight = new THREE.PointLight(0xffffff);
+    cubepointLight.position.set(50, 50, 50);
 
+    cubeScene.add(cubeambientLight);
+    cubeScene.add(cubepointLight);
+    cubeAxises.add(cubeMesh);
 
-
-document.body.appendChild(renderer.domElement);
-// 添加环境光和点光
-var ambientLight = new THREE.AmbientLight(0xffffff);
-scene.add(ambientLight);
-
-var pointLight = new THREE.PointLight(0xffffff);
-pointLight.position.set(500, 500, 500);
-scene.add(pointLight);
-
-
-// 监听拖放事件
-window.addEventListener('dragover', function (event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-});
-
-window.addEventListener('drop', function (event) {
-    event.preventDefault();
-    read_file(event.dataTransfer.files[0]);
-});
-
-
-//在scene显示坐标系
-var coneGeometry = new THREE.ConeGeometry(1, 2, 4); // 参数分别为底面半径、高度和分段数
-axises = new THREE.Group();
-axises.name = "ViewerAxises";
-//创建一个立方体框架
-var cubeGeometry = new THREE.BoxGeometry(250, 250, 250);
-var edges = new THREE.EdgesGeometry(cubeGeometry);
-var cubeMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
-var cube = new THREE.LineSegments(edges, cubeMaterial);
-cube.position.set(0, 0, 125);
-axises.add(cube);
-
-// var planeMaterial = new THREE.MeshBasicMaterial({ color: 0x888822, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
-// var planeGeometry = new THREE.PlaneGeometry(250, 250);
-// var plane = new THREE.Mesh(planeGeometry, planeMaterial);
-// axises.add(plane);
-var size = 250;
-var divisions = 25;
-var gridHelper = new THREE.GridHelper(size, divisions);
-// 将网格旋转90度，使其位于xy平面上
-gridHelper.rotation.x = Math.PI / 2;
-axises.add(gridHelper);
-
-// 创建X轴线
-var xAxisGeometry = new THREE.Geometry();
-xAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-xAxisGeometry.vertices.push(new THREE.Vector3(10, 0, 0));
-var xAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-var xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
-axises.add(xAxis);
-//创建X轴箭头
-var coneXMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-var coneXMesh = new THREE.Mesh(coneGeometry, coneXMaterial);
-coneXMesh.position.set(10, 0, 0);
-coneXMesh.rotation.set(0, 0, -Math.PI / 2);
-axises.add(coneXMesh);
-
-// 创建Y轴线
-var yAxisGeometry = new THREE.Geometry();
-yAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-yAxisGeometry.vertices.push(new THREE.Vector3(0, 10, 0));
-var yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-var yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
-axises.add(yAxis);
-//创建Y轴箭头
-var coneYMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-var coneYMesh = new THREE.Mesh(coneGeometry, coneYMaterial);
-coneYMesh.position.set(0, 10, 0);
-axises.add(coneYMesh);
-
-// 创建Z轴线
-var zAxisGeometry = new THREE.Geometry();
-zAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-zAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 10));
-var zAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
-var zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
-axises.add(zAxis);
-//创建Z轴箭头
-var coneZMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-var coneZMesh = new THREE.Mesh(coneGeometry, coneZMaterial);
-coneZMesh.position.set(0, 0, 10);
-coneZMesh.rotation.set(Math.PI / 2, 0, 0);
-axises.add(coneZMesh);
-
-scene.add(axises);
-
-
-// 视角控制器
-//创建一个用于显示小立方体的HTML元素，并将其添加到页面的适当位置。为了在右上角显示，并设置合适的top和right样式属性。
-cubeContainer = document.createElement('div');
-cubeContainer.id = 'cube-container';
-cubeContainer.style.position = 'absolute';
-cubeContainer.style.top = '10px';
-cubeContainer.style.right = '10px'
-cubeContainer.style.width = '150px';
-cubeContainer.style.height = '150px';
-//cubeContainer.style.border = '1px solid white';
-document.body.appendChild(cubeContainer);
-
-cubeRenderer = new THREE.WebGLRenderer({ alpha: true });
-cubeRenderer.setSize(150, 150);
-cubeContainer.appendChild(cubeRenderer.domElement);
-
-//创建一个THREE.Scene用于放置小立方体，并创建一个THREE.PerspectiveCamera用于观察这个场景。
-cubeScene = new THREE.Scene();
-//cubeScene.background = new THREE.Color(0x888888);
-cubeCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-
-cubeCamera.position.set(0, -15, 15);
-cubeCamera.lookAt(0, 0, 0);
-cubeCamera.up = new THREE.Vector3(0, 0, 1);
-
-
-
-cubeAxises = new THREE.Group();
-cubeAxises.name = "cubeAxises";
-//创建一个THREE.CubeGeometry用于创建小立方体的各个面，并将其添加到场景中。
-var faceNames = ["front", "back", "left", "right", "top", "bottom"];
-var faceColors = [0xff0000, 0x0000ff, 0x00ff00, 0xffff00, 0xff00ff, 0x00ffff];
-var cubeMaterials = [];
-for (var i = 0; i < faceNames.length; i++) {
-    var material = new THREE.MeshBasicMaterial({ color: faceColors[i], transparent: true, opacity: 0.5 });
-    var textTexture = createTextTexture(faceNames[i]);
-    material.map = textTexture;
-    cubeMaterials.push(material);
-}
-
-//创建一个THREE.WebGLRenderer用于渲染小立方体，并将其添加到页面的适当位置。
-var cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
-cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterials);
-
-var cubeambientLight = new THREE.AmbientLight(0xffffff);
-var cubepointLight = new THREE.PointLight(0xffffff);
-cubepointLight.position.set(50, 50, 50);
-
-cubeScene.add(cubeambientLight);
-cubeScene.add(cubepointLight);
-cubeAxises.add(cubeMesh);
-
-//在cubeSene显示坐标系
-// 创建X轴线
-var cubeXAxisGeometry = new THREE.Geometry();
-cubeXAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-cubeXAxisGeometry.vertices.push(new THREE.Vector3(25, 0, 0));
-var cubeXAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-var cubeXAxis = new THREE.Line(cubeXAxisGeometry, cubeXAxisMaterial);
-cubeAxises.add(cubeXAxis);
-// 创建Y轴线
-var cubeYAxisGeometry = new THREE.Geometry();
-cubeYAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-cubeYAxisGeometry.vertices.push(new THREE.Vector3(0, 25, 0));
-var cubeYAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-var cubeYAxis = new THREE.Line(cubeYAxisGeometry, cubeYAxisMaterial);
-cubeAxises.add(cubeYAxis);
-// 创建Z轴线
-var cubeZAxisGeometry = new THREE.Geometry();
-cubeZAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
-cubeZAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 25));
-var cubeZAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
-var cubeZAxis = new THREE.Line(cubeZAxisGeometry, cubeZAxisMaterial);
-cubeAxises.add(cubeZAxis);
-cubeScene.add(cubeAxises);
-initMenu();
-initStats();
-initControl();
+    //在cubeSene显示坐标系
+    // 创建X轴线
+    var cubeXAxisGeometry = new THREE.Geometry();
+    cubeXAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    cubeXAxisGeometry.vertices.push(new THREE.Vector3(25, 0, 0));
+    var cubeXAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    var cubeXAxis = new THREE.Line(cubeXAxisGeometry, cubeXAxisMaterial);
+    cubeAxises.add(cubeXAxis);
+    // 创建Y轴线
+    var cubeYAxisGeometry = new THREE.Geometry();
+    cubeYAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    cubeYAxisGeometry.vertices.push(new THREE.Vector3(0, 25, 0));
+    var cubeYAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    var cubeYAxis = new THREE.Line(cubeYAxisGeometry, cubeYAxisMaterial);
+    cubeAxises.add(cubeYAxis);
+    // 创建Z轴线
+    var cubeZAxisGeometry = new THREE.Geometry();
+    cubeZAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
+    cubeZAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 25));
+    var cubeZAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+    var cubeZAxis = new THREE.Line(cubeZAxisGeometry, cubeZAxisMaterial);
+    cubeAxises.add(cubeZAxis);
+    cubeScene.add(cubeAxises);
+    initMenu();
+    initStats();
+    initControl();
 }
 function initMenu() {
     var menu = document.getElementById('menu');
@@ -723,7 +796,7 @@ var isASCII = false;
 function loadModle(contents, type) {
     var geometry;
     if (type == "GCODE") {
-        gCode = parseGcode(contents);
+        gCode = parseGcode(contents, 0, 0, 0, 0);
         var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
         var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
         gCode.children[0].material = g0Material;
@@ -842,12 +915,12 @@ function parseSTL(contents) {
     return geometry;
 }
 
-function parseGcode(contents) {
+function parseGcode(contents, x, y, z, a) {
     var lines = contents.split('\n');
 
     var geometries = new THREE.Group();
     geometries.name = "GCODE";
-    var x = 0, y = 0, z = 0, a = 0; // 增加a变量来保存A轴的值
+    //var x = 0, y = 0, z = 0, a = 0; // 增加a变量来保存A轴的值
     var oldx = 0, oldy = 0, oldz = 0, olda = 0; // 增加a变量来保存A轴的值
     var oldCode = "G0";
     var g0Geometry = new THREE.Geometry(); // g0路径的几何体
