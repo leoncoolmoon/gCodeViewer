@@ -20,7 +20,8 @@ Once you have the library included, you can use the functions provided in the co
 To run the code, simply open the HTML file that includes this JavaScript code in a web browser.
 
 ## Dependencies
-- Three.js library
+- Three.js 
+- codemirror.js
 
 ## License
 This code is provided under the MIT license. Please refer to the LICENSE file for more information.
