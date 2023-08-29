@@ -2,12 +2,14 @@
 var cubeRenderer, cubeScene, cubeMesh, cubeCamera, cubeControls, cubeContainer, cubeCamZ, cubeCamY, cubeCamX;
 var renderer, scene, camera, controls, stats, CamZ, CamY, CamX;
 var isDragging = false;
-var axises, cubeAxises, gCode, sTl;
+var axises, cubeAxises, gCode, tGcode, sTl, isolateModel = new THREE.Group();
 var plainTextFile = "tap,gcode,nc,mpt,mpf";
 var STL = "stl";
 var mark;
+var timer;
 var divider, dividerPos;
 var type = "UNKNOWN";
+var codeMirrorStartSellecting = false;
 // 创建球体对象
 var cursor3D = new THREE.Group();
 cursor3D.name = "cursor";
@@ -33,23 +35,251 @@ cursor3D.add(new THREE.Points(cursor3DP, new THREE.PointsMaterial({
     sizeAttenuation: false, // 关闭点的大小衰减
     transparent: true // 开启透明度
 })));
+// 定义一个射线投射器
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+var oldLineNum = 0;
 
 //cursor3D.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 })));
 cursor3D.visible = false;
 init();
 render();
 initStats();
-
 var txar = CodeMirror.fromTextArea(document.getElementById('txar'), {
     lineNumbers: true,
     mode: "gcode"
 });
-//获取当前三维坐标
-function getCordinats(line) {
+var isolateMode = false;
+var viewMode = 0;
+txar.on("cursorActivity", function () {
+    var cursor = txar.getCursor();
+    var lineNumber = cursor.line;// + 1; // 行号从0开始，所以需要加1
+    markLine(lineNumber, false);
+    // 将球体添加到场景中
+    if (codeMirrorStartSellecting) {
+        filterCmd();
+        codeMirrorStartSellecting = false;
+    } else {
+        fxisolationMode(isolateLayer(lineNumber));
+    }
+});
+
+txar.on("mousedown", function (txar, event) {
+    codeMirrorStartSellecting = true;
+    console.log("mousedownT");
+});
+
+txar.on("mouseup", function (txar, event) {
+    codeMirrorStartSellecting = false;
+    fxisolationMode();
+    console.log("mouseupT");
+});
+
+txar.on("keyup", function (txar, event) {
+    if (event.key === "Shift") {
+        // set a timmer delay here if in 1000ms shift key is not pressed then enter the isolation mode       
+        filterCmd();
+        console.log("Shift key was released");
+    }
+    if (event.key == "Escape") {
+        //exit isolation mode
+        fxisolationMode();
+        if (mark !== undefined) {
+            mark.clear();
+        }
+        console.log("Escape key was released");
+    }
+});
+//双击重置视角
+cubeRenderer.domElement.addEventListener('dblclick', function (event) {
+    resetView();
+});
+renderer.domElement.addEventListener('dblclick', function (event) {
+    autoMagnify();
+});
+//同步转动
+controls.addEventListener('change', function (event) {
+    if (!supressMain) {
+        cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
+        cubeCamera.lookAt(0, 0, 0);
+        supressCube = true;
+    }
+});
+cubeControls.addEventListener('change', function (event) {
+    if (!supressCube) {
+        camera.position.copy(calculatePoint3(cubeCamera.position, camera.position));
+        camera.lookAt(0, 0, 0);
+        supressMain = true;
+    }
+});
+
+document.addEventListener('mousedown', function (e) {
+    isDragging = e.target.id === 'divider';
+    divider.style.background = 'rgba(64,128,200,0.5)';
+    if (e.target.className.includes("CodeMirror")) {
+        codeMirrorStartSellecting = true;
+        console.log("mousedown");
+    }
+});
+document.addEventListener('mousemove', function (e) {
+    if (e.target.id === 'divider') {
+        divider.style.background = 'rgba(64,128,200,0.5)';
+    } else {
+        if (!isDragging) {
+            divider.style.background = 'rgba(128,128,128,0.5)';
+        }
+    }
+    if (!isDragging) return;
+    document.getElementById('divider').style.left = e.x + 'px';
+    //console.log("left = " + e.x);
+    document.getElementById('codeViewer').style.width = e.x + 'px';
+    //检查鼠标是否移出了目标元素
+    var rect = e.target.getBoundingClientRect();
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        //console.log('Mouse moved out of target');
+        isDragging = false;
+        supressMain = false;
+        supressCube = false;
+        divider.style.background = 'rgba(128,128,128,0.5)';
+    }
+    if (codeMirrorStartSellecting && !e.target.className.includes("CodeMirror")) {
+        codeMirrorStartSellecting = false;
+        fxisolationMode();
+        console.log("mouseupM");
+    }
+});
+
+document.addEventListener('mouseup', function (e) {
+    isDragging = false;
+    supressMain = false;
+    supressCube = false;
+    divider.style.background = 'rgba(128,128,128,0.5)';
+    //txar.on("mouseup",fxisolationMode);
+    if (codeMirrorStartSellecting) {
+        codeMirrorStartSellecting = false;
+        fxisolationMode();
+        console.log("mouseup");
+    }
+});
+
+function disableKeyboardInput() {
+    function disableEvent(event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    // 移除键盘事件监听器
+    scene.removeEventListener('keydown', disableEvent, false);
+    scene.removeEventListener('keyup', disableEvent, false);
+}
+//监听屏幕大小变化
+window.addEventListener('resize', function onWindowResize() {
+    // 调整渲染器大小
+    var aspect = window.innerWidth / window.innerHeight;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    cubeCamera.aspect = 1;
+    cubeCamera.updateProjectionMatrix();
+    cubeRenderer.setSize(150, 150);
+    cubeRenderer.render(cubeScene, cubeCamera);
+    cubeControls.update();
+}, false);
+
+// 监听拖放事件
+window.addEventListener('dragover', function (event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+});
+
+window.addEventListener('drop', function (event) {
+    event.preventDefault();
+    read_file(event.dataTransfer.files[0]);
+});
+
+// 监听鼠标移动事件
+window.addEventListener('mousemove', function onMouseMove(event) {
+    // 计算鼠标在屏幕上的位置
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    //console.log("x=" + mouse.x + " y=" + mouse.y);
+}, false);
+
+// 监听鼠标点击事件
+window.addEventListener('click', function onClick(event) {
+    // 更新射线投射器的起点和方向
+    raycaster.setFromCamera(mouse, camera);
+
+    // 计算与射线相交的物体
+    var intersects = raycaster.intersectObjects(scene.children, true);
+    if (gCode == undefined) return;
+    var codeLines = [];
+    // 如果有相交的物体
+    if (intersects.length > 0) {
+        console.log(intersects);
+        all_loop:
+        for (var i = 0; i < intersects.length; i++) {
+            var intersect = intersects[i];
+            if (intersect.object.type == "Points") {
+                var delta = 0.1;
+                var x = intersect.point.x;
+                var y = intersect.point.y;
+                var z = intersect.point.z;
+                var uuid = intersect.object.uuid;
+                if (mark !== undefined) {
+                    mark.clear();
+                }
+                for (var j = 0; j < gCode.children.length; j++) {
+                    var child = gCode.children[j];
+                    if (child.uuid == uuid) {
+                        for (var k = 0; k < child.geometry.vertices.length; k++) {
+                            var vertex = child.geometry.vertices[k];
+                            if (
+                                Math.abs(vertex.x - x) <= delta
+                                && Math.abs(vertex.y - y) <= delta
+                                && Math.abs(vertex.z - z) <= delta
+                            ) {
+                                console.log(vertex.name);
+                                console.log("abs(x:" + vertex.x + "-p.x:" + x + ")=" + Math.abs(vertex.x - x));
+                                console.log("abs(y:" + vertex.y + "-p.y:" + y + ")=" + Math.abs(vertex.y - y));
+                                console.log("abs(z:" + vertex.z + "-p.z:" + z + ")=" + Math.abs(vertex.z - z));
+                                if (vertex.name != undefined) {
+                                    var lineNumber = parseInt(vertex.name.substring(1));
+                                    codeLines.push(lineNumber);
+                                    //break; // 跳出最内层的循环
+                                    break all_loop; // 跳出所有的循环
+                                }
+                            }
+                        }
+
+                    }
+                }
+            } else {
+                if (mark !== undefined) {
+                    mark.clear();
+                }
+                cursor3D.visible = false;
+            }
+        }
+        if (codeLines.length != 0) {
+            var tLine = codeLines[0];
+            codeLines.forEach(codeline => {
+                tLine = tLine > codeline ? codeline : tLine;
+            });
+
+            markLine(tLine, true);
+            oldLineNum = tLine;
+        }
+    }
+}, false);
+
+//向前扫描获取当前三维坐标以及最近的z轴高度，向后可获取可能的安全z轴高度
+function getCordinats(line, forward) {
     var x, y, z, e, a = 0;
     var currentLine = line;
-    while ((x === undefined || y === undefined || z === undefined) && currentLine >= 0) {
-        var lineContent = txar.getLine(currentLine--);
+    var maxLine = txar.lineCount();
+    while ((x === undefined || y === undefined || z === undefined) && (forward ? currentLine >= 0 : currentLine <= maxLine)) {
+        var lineContent = txar.getLine(forward ? currentLine-- : currentLine++);
         if (lineContent === undefined) break;
         if (!lineContent.includes(" ")) continue;
         var parts = lineContent.split(' ');
@@ -82,86 +312,233 @@ function getCordinats(line) {
     document.getElementById('a').innerHTML = "A:" + a;
 
     //return new THREE.Vector3(x, y, z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
-    return { x: x, y: y, z: z, e: e, a: a };
+    return { x: x, y: y, z: z, e: e, a: a, line: currentLine };
 }
-var isolateMode = false;
-txar.on("cursorActivity", function () {
-    var cursor = txar.getCursor();
-    var lineNumber = cursor.line;// + 1; // 行号从0开始，所以需要加1
-    markLine(lineNumber, false);
-    // 将球体添加到场景中
-});
-
-
-
-var timer;
-txar.on("keyup", function (txar, event) {
-    if (event.key === "Shift") {
-        // set a timmer delay here if in 1000ms shift key is not pressed then enter the isolation mode       
-        filterCmd();
-      console.log("Shift key was released");
+//输入行号后返回此行所在层的开始行号以及结束行号
+function isolateLayer(lineNumber) {
+    if (gCode === undefined) {
+        return { start: 0, end: 0 };
     }
-  });
-  function filterCmd(){
+    //获取当当前z轴高度以及安全z轴高度
+    var locArray = getCordinats(lineNumber, true);
+    var z = locArray.z;
+    var safeZ0, safeZ1, safeZ;
+    var safeLine0, safeLine1;
+    var flocArray, blocArray, oldFlocArray, oldBlocArray;
+    if (locArray.line > 1) {
+        // 向上去寻找z值不相等的行，获取其z值以及行号
+        flocArray = getCordinats(locArray.line - 1, true);
+        while (flocArray.z === z && flocArray.line > 1) {
+            flocArray = getCordinats(flocArray.line - 1, true);
+        }
+        safeZ0 = flocArray.z;
+        safeLine0 = flocArray.line;
+    }
+    if (lineNumber + 1 < txar.lineCount()) {
+        // 向下去寻找z值不相等的行，获取其z值以及行号
+        blocArray = getCordinats(lineNumber + 1, false);
+        while (blocArray.z === z && blocArray.line + 1 < txar.lineCount()) {
+            blocArray = getCordinats(blocArray.line + 1, false);
+        }
+        safeZ1 = blocArray.z;
+        safeLine1 = blocArray.line;
+    }
+    if (safeZ1 === undefined || safeZ0 === undefined || z === undefined) {
+        //failed to get safe z or z 
+        return { start: 0, end: 0 };
+    }
+    if (safeZ1 === safeZ0) {
+        //正常可以确认安全z轴高度的情况
+        //get the right safe z
+        safeZ = safeZ1;
+        // 向上去寻找不等于z以及safeZ的行号
+        while ((flocArray.z === safeZ || flocArray.z === z) && flocArray.line > 1) {
+            //oldFlocArray = flocArray.slience();
+            oldFlocArray = Object.assign({}, flocArray);
+            flocArray = getCordinats(flocArray.line - 1, true);
+        }
+        // 向下去寻找不等于z以及safeZ的行号
+        while ((blocArray.z === safeZ || blocArray.z === z) && blocArray.line + 1 < txar.lineCount()) {
+            //oldBlocArray = blocArray.slience();
+            oldBlocArray = Object.assign({}, blocArray);
+            blocArray = getCordinats(blocArray.line + 1, false);
+        }
+        //前一个搜索到的行号就是本层的开始行号/结束行号
+        return { start: oldFlocArray.line, end: oldBlocArray.line };
+    } else if (safeZ0 < safeZ1) {
+        //比较正常的情况
+        if (safeZ0 < z) {
+            // safeZ0 可能是前一层的z轴高
+            if (safeZ1 > z) {
+                //safeZ1 可能是下一层的z轴高 或是标准的安全z轴高
+                //再下一个z如果<safeZ1，那么safeZ1就是安全z轴高
+                //再下一个z如果>safeZ1，那么safeZ1就是下一层的z轴高
+
+                if (safeLine1 + 1 < txar.lineCount()) {
+                    // 向下去寻找z值不相等的行，获取其z值以及行号
+                    blocArray = getCordinats(safeLine1 + 1, false);
+                    while (blocArray.z === z && blocArray.line + 1 < txar.lineCount()) {
+                        blocArray = getCordinats(blocArray.line + 1, false);
+                    }
+                    // blocArray.z;
+                    // blocArray.line;
+
+                    if (blocArray.z < safeZ1 && blocArray.z == z) {
+                        //safeZ1是安全z轴高
+                        //寻找下一个z值不等于原本z以及safeZ1的行号
+                        while ((blocArray.z === safeZ1 || blocArray.z === z) && blocArray.line + 1 < txar.lineCount()) {
+                            //oldBlocArray = blocArray.slience();
+                            oldBlocArray = Object.assign({}, blocArray);
+                            blocArray = getCordinats(blocArray.line + 1, false);
+                        }
+                        return { start: safeLine0 + 1, end: oldBlocArray.line };
+                    } else {
+                        //下一层的z轴高
+                        return { start: safeLine0 + 1, end: blocArray.line - 1 };
+                    }
+                }
+                //以及扫到最后一行
+                return { start: safeLine0 + 1, end: txar.lineCount() };
+            }
+            //safeZ1 < z  是不可能出现的
+            return { start: 0, end: 0 };
+        } else {
+            // safeZ0 可能是前一层的安全z轴高
+            if (safeZ1 > z) {
+                //safeZ1 可能是下一层的z轴高 或是标准的安全z轴高
+                //再下一个z如果<safeZ1，那么safeZ1就是安全z轴高
+                //再下一个z如果>safeZ1，那么safeZ1就是下一层的z轴高
+                if (safeLine1 + 1 < txar.lineCount()) {
+                    // 向下去寻找z值不相等的行，获取其z值以及行号
+                    blocArray = getCordinats(safeLine1 + 1, false);
+                    while (blocArray.z === z && blocArray.line + 1 < txar.lineCount()) {
+                        blocArray = getCordinats(blocArray.line + 1, false);
+                    }
+                    // blocArray.z;
+                    // blocArray.line;
+
+                    if (blocArray.z < safeZ1 && blocArray.z == z) {
+                        //safeZ1是安全z轴高
+                        //寻找下一个z值不等于原本z以及safeZ1的行号
+                        while ((blocArray.z === safeZ1 || blocArray.z === z) && blocArray.line + 1 < txar.lineCount()) {
+                            oldFlocArray = Object.assign({}, flocArray);
+                            blocArray = getCordinats(blocArray.line + 1, false);
+                        }
+                        return { start: safeLine0 + 1, end: oldBlocArray.line };
+                    } else {
+                        //下一层的z轴高
+                        return { start: safeLine0 + 1, end: blocArray.line - 1 };
+                    }
+                }
+                //以及扫到最后一行
+                return { start: safeLine0 + 1, end: txar.lineCount() };
+            }
+            //safeZ1 < z  是不可能出现的
+            return { start: 0, end: 0 };
+        }
+    } else if (safeZ0 > safeZ1) {
+        //safeZ0 有可能是标准安全高度，也有可能是前一层的安全高度
+        if (safeZ1 > z) {
+            //safeZ1 可能是下一层的z轴高
+            return { start: safeLine0 + 1, end: safeLine1 - 1 };
+        }
+        //safeZ1 < z  是不可能出现的
+        return { start: 0, end: 0 };
+    }
+    //不应该到这一步
+    return { start: 0, end: 0 };
+}
+
+function changeIsolationMode(enable) {
+    tGcode.visible = enable;
+    gCode.visible = !enable;
+}
+
+function filterCmd() {
     if (timer) {
         clearTimeout(timer);
-      }
-      timer = setTimeout(function() {
+    }
+    timer = setTimeout(function () {
+        //使用负值让程序自己获取起止位置
         fxisolationMode();
         console.log("执行指令");
-      }, 1000);
+    }, 800);
 
-  }
-function fxisolationMode() {
-    var selection = txar.getSelection();
-    if (selection.length == 0) {
-        return;
-    }
-    var lines = selection.split('\n');
-    if (lines.length > 1 && type === "GCODE") {
-        isolateMode = true;
-        gCodeClear();
-        cursor3D.visible = false;
-        var startLine = txar.getCursor("from").line;
-        var endLine = txar.getCursor("to").line;
-        var cord = getCordinats(startLine);
-        var lineContent = "";
-        for (var i = startLine; i <= endLine; i++) {
-            lineContent = lineContent + '\n'+ txar.getLine(i);
-        }
-            gCode = parseGcode(lineContent, cord.x, cord.y, cord.z, cord.e, cord.a);
-            var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
-            var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
-           try{ gCode.children[0].material = g0Material;}catch(e){}
-            try{gCode.children[1].material = g1Material;}catch(e){}
-            //add points
-            //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
-            var pMaterial = new THREE.PointsMaterial({
-                color: 0x000099,
-                size: 5,
-                sizeAttenuation: false, // 禁用点的大小自动衰减
-                alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
-                opacity: 0.75, // 设置透明度
-                transparent: true // 开启透明度
+}
+
+function fxisolationMode(range) {
+    //1.源自于codemirror的选择
+    //2.源自于codemirror的点击
+    // var selection = txar.getSelection();
+    // if (start == end || selection.length == 0) {
+    //     return;
+    // }
+    // var lines = selection.split('\n');
+    var startLine = range === undefined ? txar.getCursor("from").line : range.start;
+    var endLine = range === undefined ? txar.getCursor("to").line : range.end;
+    if (startLine == endLine) {
+        isolateModel.visible = false;
+        scene.remove(isolateModel);
+        if (isolateMode) {
+            isolateModel.children.forEach(element => {
+                element.geometry.dispose();
+                element.material.dispose();
             });
-           try{ var point0 = new THREE.Points(gCode.children[0].geometry, pMaterial);
-            point0.name = "g0points";
-            gCode.add(point0);}catch(e){};
-
-           try{ var point1 = new THREE.Points(gCode.children[1].geometry, pMaterial);
-            point1.name = "g1points";
-            gCode.add(point1);}catch(e){};
-
-            scene.add(gCode);
-        
-    } else {
-        if(isolateMode){
-            gCodeClear();
-            loadModle(txar.getValue(), type);
+            changeIsolationMode(false);
+            //loadModle(txar.getValue(), type);
             isolateMode = false;
         }
+        return;
+    }
+
+    if (!isolateMode && type === "GCODE") {
+        isolateMode = true;
+        changeIsolationMode(true);
+        cursor3D.visible = false;
+        // var startLine = txar.getCursor("from").line;
+        // var endLine = txar.getCursor("to").line;
+
+        var cord = getCordinats(startLine, true);
+        var lineContent = "";
+        for (var i = startLine; i <= endLine; i++) {
+            lineContent = lineContent + '\n' + txar.getLine(i);
+        }
+        isolateModel = parseGcode(lineContent, cord.x, cord.y, cord.z, cord.e, cord.a);
+        isolateModel.visible = true;
+        isolateModel.name = "isolateModel";
+        var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 1, transparent: true });
+        var g1Material = new THREE.LineBasicMaterial({ color: 0x000099, opacity: 0.75, transparent: true });
+        try { isolateModel.children[0].material = g0Material; } catch (e) { }
+        try { isolateModel.children[1].material = g1Material; } catch (e) { }
+        //add points
+        //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
+        var pMaterial = new THREE.PointsMaterial({
+            color: 0x990000,
+            size: 5,
+            sizeAttenuation: false, // 禁用点的大小自动衰减
+            alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
+            opacity: 1, // 设置透明度
+            transparent: true // 开启透明度
+        });
+        try {
+            var point0 = new THREE.Points(isolateModel.children[0].geometry, pMaterial);
+            point0.name = "g0points";
+            isolateModel.add(point0);
+        } catch (e) { };
+
+        try {
+            var point1 = new THREE.Points(isolateModel.children[1].geometry, pMaterial);
+            point1.name = "g1points";
+            isolateModel.add(point1);
+        } catch (e) { };
+        tGcode.renderOrder = 3;
+        isolateModel.renderOrder = 2;
+        cursor3D.visible = true;
+        cursor3D.renderOrder = 1;
+        scene.add(isolateModel);
     }
 }
+
 function markLine(lineNumber, fromViewer) {
     if (fromViewer) {
         if (oldLineNum > lineNumber) {
@@ -170,7 +547,7 @@ function markLine(lineNumber, fromViewer) {
             txar.setCursor(lineNumber, 0);
         }
     }
-    var locArray = getCordinats(lineNumber);
+    var locArray = getCordinats(lineNumber, true);
     var center = new THREE.Vector3(locArray.x, locArray.y, locArray.z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), locArray.a);
     if (center === undefined) {
         return;
@@ -183,31 +560,6 @@ function markLine(lineNumber, fromViewer) {
     mark = txar.markText(start, end, { className: "highlighted-line" });
     cursor3D.visible = true;
     cursor3D.position.set(center.x, center.y, center.z);
-}
-
-function disableKeyboardInput() {
-    function disableEvent(event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    // 移除键盘事件监听器
-    scene.removeEventListener('keydown', disableEvent, false);
-    scene.removeEventListener('keyup', disableEvent, false);
-}
-//add screensize change listener
-window.addEventListener('resize', onWindowResize, false);
-function onWindowResize() {
-    // 调整渲染器大小
-    var aspect = window.innerWidth / window.innerHeight;
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = aspect;
-    camera.updateProjectionMatrix();
-    cubeCamera.aspect = 1;
-    cubeCamera.updateProjectionMatrix();
-    cubeRenderer.setSize(150, 150);
-    cubeRenderer.render(cubeScene, cubeCamera);
-    cubeControls.update();
 }
 
 function bt_open() {
@@ -383,8 +735,6 @@ var gcodeTimer = {
     }
 };
 
-
-
 function play_pause() {
     //start play
     //start a timer to move cursor based on the gcode
@@ -461,7 +811,7 @@ function bt_simulate() {
         var cut = new THREE.Mesh(extrudeGeometry, new THREE.MeshBasicMaterial({ color: 0x000000 }));
         cnc.add(cut);
         gCode.children[3].forEach(element => {
-            cylinderGeometry.setPosition(element.x, element.y, element.z);
+            cylinderGeometry.position.set(element.x, element.y, element.z);
             cnc.add(new THREE.Mesh(cylinderGeometry, new THREE.MeshBasicMaterial({ color: 0x000000 })));
         });
         scene.add(cnc);
@@ -484,6 +834,7 @@ function bt_simulate() {
         scene.add(prints);
     }
 }
+
 //add relative function end
 function init() {
     scene = new THREE.Scene();
@@ -519,69 +870,13 @@ function init() {
     v.style.top = '5vh';
     v.style.left = '0px';
 
-    document.addEventListener('mousedown', function (e) {
-        isDragging = e.target.id === 'divider';
-        divider.style.background = 'rgba(64,128,200,0.5)';
-    });
-    document.addEventListener('mousemove', function (e) {
-        if (e.target.id === 'divider') {
-            divider.style.background = 'rgba(64,128,200,0.5)';
-        } else {
-            if (!isDragging) {
-                divider.style.background = 'rgba(128,128,128,0.5)';
-            }
-        }
-        if (!isDragging) return;
-        document.getElementById('divider').style.left = e.x + 'px';
-        //console.log("left = " + e.x);
-        document.getElementById('codeViewer').style.width = e.x + 'px';
-        //检查鼠标是否移出了目标元素
-        var rect = e.target.getBoundingClientRect();
-        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-            //console.log('Mouse moved out of target');
-            isDragging = false;
-            supressMain = false;
-            supressCube = false;
-            divider.style.background = 'rgba(128,128,128,0.5)';
-
-        }
-    });
-
-    document.addEventListener('mouseup', function (e) {
-        isDragging = false;
-        supressMain = false;
-        supressCube = false;
-        divider.style.background = 'rgba(128,128,128,0.5)';
-        //txar.on("mouseup",fxisolationMode);
-        if(e.target.className.includes("CodeMirror")){
-            fxisolationMode();
-        }
-    });
-
-
-
     document.body.appendChild(renderer.domElement);
     // 添加环境光和点光
     var ambientLight = new THREE.AmbientLight(0xffffff);
     scene.add(ambientLight);
-
     var pointLight = new THREE.PointLight(0xffffff);
     pointLight.position.set(500, 500, 500);
     scene.add(pointLight);
-
-
-    // 监听拖放事件
-    window.addEventListener('dragover', function (event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    });
-
-    window.addEventListener('drop', function (event) {
-        event.preventDefault();
-        read_file(event.dataTransfer.files[0]);
-    });
-
-
     //在scene显示坐标系
     var coneGeometry = new THREE.ConeGeometry(1, 2, 4); // 参数分别为底面半径、高度和分段数
     axises = new THREE.Group();
@@ -782,6 +1077,7 @@ function initControl() {
     cubeControls.enablePan = false;
     cubeControls.update();
 };
+
 function getFileExtension(filename) {
     return filename.split('.').pop().toLowerCase();
 }
@@ -829,6 +1125,23 @@ function loadModle(contents, type) {
         //add bounding box end
         //gCode.position.set(-80.5, -95.5, 0);
         scene.add(gCode);
+        //添加一个透明的gCode
+        tGcode = gCode.clone();
+        var originalOpacity = new Map();
+        tGcode.traverse(function (child) {
+            if (child.material) {
+                child.material = child.material.clone();
+                // 存储原始的透明度值
+                if (!originalOpacity.has(child.material.uuid)) {
+                    originalOpacity.set(child.material.uuid, child.material.opacity);
+                    child.material.opacity = 0.02;
+                    //child.material.transparent = true;
+                }
+            }
+        });
+        tGcode.name = "tGcode";
+        tGcode.visible = false;
+        scene.add(tGcode);
     }
     else if (type == "STL") {
         geometry = parseSTL(contents);
@@ -922,7 +1235,8 @@ function parseGcode(contents, x, y, z, a) {
     var geometries = new THREE.Group();
     geometries.name = "GCODE";
     //var x = 0, y = 0, z = 0, a = 0; // 增加a变量来保存A轴的值
-    var oldx = 0, oldy = 0, oldz = 0, olda = 0; // 增加a变量来保存A轴的值
+    //var oldx = 0, oldy = 0, oldz = 0, olda = 0; // 增加a变量来保存A轴的值
+    var oldx = x, oldy = y, oldz = z, olda = a; // 增加a变量来保存A轴的值
     var oldCode = "G0";
     var g0Geometry = new THREE.Geometry(); // g0路径的几何体
     var g1Geometry = new THREE.Geometry(); // g1路径的几何体
@@ -983,10 +1297,6 @@ function parseGcode(contents, x, y, z, a) {
     return geometries;
 }
 
-cubeRenderer.domElement.addEventListener('dblclick', function (event) {
-    resetView();
-});
-
 function resetView() {
     //controls.reset();
     camera.position.set(0, -200, 200);
@@ -998,9 +1308,7 @@ function resetView() {
     camera.updateProjectionMatrix();
     initControl();
 }
-renderer.domElement.addEventListener('dblclick', function (event) {
-    autoMagnify();
-});
+
 function autoMagnify() {
 
     // 计算模型的包围盒
@@ -1039,21 +1347,7 @@ function autoMagnify() {
 
 var supressMain = false;
 var supressCube = false;
-//同步转动
-controls.addEventListener('change', function (event) {
-    if (!supressMain) {
-        cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
-        cubeCamera.lookAt(0, 0, 0);
-        supressCube = true;
-    }
-});
-cubeControls.addEventListener('change', function (event) {
-    if (!supressCube) {
-        camera.position.copy(calculatePoint3(cubeCamera.position, camera.position));
-        camera.lookAt(0, 0, 0);
-        supressMain = true;
-    }
-});
+
 function calculatePoint3(movePoint, followPoint) {
     var distance = followPoint.distanceTo(new THREE.Vector3(0, 0, 0));
     var direction = new THREE.Vector3().subVectors(movePoint, new THREE.Vector3(0, 0, 0)).normalize();
@@ -1061,87 +1355,5 @@ function calculatePoint3(movePoint, followPoint) {
 }
 
 
-// 定义一个射线投射器
-var raycaster = new THREE.Raycaster();
-var mouse = new THREE.Vector2();
-
-// 监听鼠标移动事件
-window.addEventListener('mousemove', onMouseMove, false);
-// 监听鼠标点击事件
-window.addEventListener('click', onClick, false);
-
-function onMouseMove(event) {
-    // 计算鼠标在屏幕上的位置
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    //console.log("x=" + mouse.x + " y=" + mouse.y);
-}
 
 
-var oldLineNum = 0;
-function onClick(event) {
-    // 更新射线投射器的起点和方向
-    raycaster.setFromCamera(mouse, camera);
-
-    // 计算与射线相交的物体
-    var intersects = raycaster.intersectObjects(scene.children, true);
-    if (gCode == undefined) return;
-    var codeLines = [];
-    // 如果有相交的物体
-    if (intersects.length > 0) {
-        console.log(intersects);
-        all_loop:
-        for (var i = 0; i < intersects.length; i++) {
-            var intersect = intersects[i];
-            if (intersect.object.type == "Points") {
-                var delta = 0.1;
-                var x = intersect.point.x;
-                var y = intersect.point.y;
-                var z = intersect.point.z;
-                var uuid = intersect.object.uuid;
-                if (mark !== undefined) {
-                    mark.clear();
-                }
-                for (var j = 0; j < gCode.children.length; j++) {
-                    var child = gCode.children[j];
-                    if (child.uuid == uuid) {
-                        for (var k = 0; k < child.geometry.vertices.length; k++) {
-                            var vertex = child.geometry.vertices[k];
-                            if (
-                                Math.abs(vertex.x - x) <= delta
-                                && Math.abs(vertex.y - y) <= delta
-                                && Math.abs(vertex.z - z) <= delta
-                            ) {
-                                console.log(vertex.name);
-                                console.log("abs(x:" + vertex.x + "-p.x:" + x + ")=" + Math.abs(vertex.x - x));
-                                console.log("abs(y:" + vertex.y + "-p.y:" + y + ")=" + Math.abs(vertex.y - y));
-                                console.log("abs(z:" + vertex.z + "-p.z:" + z + ")=" + Math.abs(vertex.z - z));
-                                if (vertex.name != undefined) {
-                                    var lineNumber = parseInt(vertex.name.substring(1));
-                                    codeLines.push(lineNumber);
-                                    //break; // 跳出最内层的循环
-                                    break all_loop; // 跳出所有的循环
-                                }
-                            }
-                        }
-
-                    }
-                }
-            } else {
-                if (mark !== undefined) {
-                    mark.clear();
-                }
-                cursor3D.visible = false;
-            }
-        }
-        if (codeLines.length != 0) {
-            var tLine = codeLines[0];
-            codeLines.forEach(codeline => {
-                tLine = tLine > codeline ? codeline : tLine;
-            });
-
-            markLine(tLine, true);
-            oldLineNum = tLine;
-        }
-    }
-}
