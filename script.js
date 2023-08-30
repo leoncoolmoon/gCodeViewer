@@ -3,6 +3,7 @@ var cubeRenderer, cubeScene, cubeMesh, cubeCamera, cubeControls, cubeContainer, 
 var renderer, scene, camera, controls, stats, CamZ, CamY, CamX;
 var isDragging = false;
 var axises, cubeAxises, gCode, tGcode, sTl, isolateModel = new THREE.Group();
+var selectedLineContent;
 var plainTextFile = "tap,gcode,nc,mpt,mpf";
 var STL = "stl";
 var mark;
@@ -10,6 +11,11 @@ var timer;
 var divider, dividerPos;
 var type = "UNKNOWN";
 var codeMirrorStartSellecting = false;
+var isDragging = false;
+var supressMain = false;
+var supressCube = false;
+var isASCII = false;
+
 // 创建球体对象
 var cursor3D = new THREE.Group();
 cursor3D.name = "cursor";
@@ -116,10 +122,10 @@ cubeControls.addEventListener('change', function (event) {
 document.addEventListener('mousedown', function (e) {
     isDragging = e.target.id === 'divider';
     divider.style.background = 'rgba(64,128,200,0.5)';
-    if (e.target.className.includes("CodeMirror")) {
-        codeMirrorStartSellecting = true;
-        console.log("mousedown");
-    }
+    // if (e.target.className.includes("CodeMirror")) {
+    //     codeMirrorStartSellecting = true;
+    //     console.log("mousedown");
+    // }
 });
 document.addEventListener('mousemove', function (e) {
     if (e.target.id === 'divider') {
@@ -207,6 +213,8 @@ window.addEventListener('mousemove', function onMouseMove(event) {
 
 // 监听鼠标点击事件
 window.addEventListener('click', function onClick(event) {
+    //判断是否为鼠标左键点击,如果不是则返回
+    if (event.button !== 0) return;
     // 更新射线投射器的起点和方向
     raycaster.setFromCamera(mouse, camera);
 
@@ -220,7 +228,7 @@ window.addEventListener('click', function onClick(event) {
         all_loop:
         for (var i = 0; i < intersects.length; i++) {
             var intersect = intersects[i];
-            if (intersect.object.type == "Points") {
+            if (intersect.object.type === 'LineSegments') {
                 var delta = 0.1;
                 var x = intersect.point.x;
                 var y = intersect.point.y;
@@ -229,7 +237,7 @@ window.addEventListener('click', function onClick(event) {
                 if (mark !== undefined) {
                     mark.clear();
                 }
-                for (var j = 0; j < gCode.children.length; j++) {
+                for (var j = 0; j < gCode.children.length - 1; j++) {
                     var child = gCode.children[j];
                     if (child.uuid == uuid) {
                         for (var k = 0; k < child.geometry.vertices.length; k++) {
@@ -244,7 +252,7 @@ window.addEventListener('click', function onClick(event) {
                                 console.log("abs(y:" + vertex.y + "-p.y:" + y + ")=" + Math.abs(vertex.y - y));
                                 console.log("abs(z:" + vertex.z + "-p.z:" + z + ")=" + Math.abs(vertex.z - z));
                                 if (vertex.name != undefined) {
-                                    var lineNumber = parseInt(vertex.name.substring(1));
+                                    var lineNumber = parseInt(vertex.name.substring(2));
                                     codeLines.push(lineNumber);
                                     //break; // 跳出最内层的循环
                                     break all_loop; // 跳出所有的循环
@@ -269,6 +277,11 @@ window.addEventListener('click', function onClick(event) {
 
             markLine(tLine, true);
             oldLineNum = tLine;
+        } else {
+            //没有找到对应的行号
+            //恢复正常显示,退出隔离模式
+            fxisolationMode();
+
         }
     }
 }, false);
@@ -476,6 +489,7 @@ function fxisolationMode(range) {
     // var lines = selection.split('\n');
     var startLine = range === undefined ? txar.getCursor("from").line : range.start;
     var endLine = range === undefined ? txar.getCursor("to").line : range.end;
+    //如果没有任何定义的起止点并且没有选择任何内容则退出隔离模式
     if (startLine == endLine) {
         isolateModel.visible = false;
         scene.remove(isolateModel);
@@ -490,26 +504,39 @@ function fxisolationMode(range) {
         }
         return;
     }
-
+    //隔离模式没有开启并且处理的时gcode则开启隔离模式
+    //否则保留现在的模式不做处理
     if (!isolateMode && type === "GCODE") {
         isolateMode = true;
         changeIsolationMode(true);
         cursor3D.visible = false;
         // var startLine = txar.getCursor("from").line;
         // var endLine = txar.getCursor("to").line;
-
-        var cord = getCordinats(startLine, true);
-        var lineContent = "";
-        for (var i = startLine; i <= endLine; i++) {
-            lineContent = lineContent + '\n' + txar.getLine(i);
+        if (startLine > endLine) {
+            var temp = startLine;
+            startLine = endLine;
+            endLine = temp;
         }
-        isolateModel = parseGcode(lineContent, cord.x, cord.y, cord.z, cord.e, cord.a);
+        var cord = getCordinats(startLine, true);
+        selectedLineContent = "";
+        for (var i = startLine; i <= endLine; i++) {
+            selectedLineContent = selectedLineContent + '\n' + txar.getLine(i);
+        }
+        var pre;
+        if (startLine >= 1) { pre = txar.getLine(startLine - 1).slice(0, 2) === "G0" ? "G0" : "G1"; } else { pre = "G1"; }
+        isolateModel = parseGcode(selectedLineContent, cord.x, cord.y, cord.z, cord.a, startLine, pre);
         isolateModel.visible = true;
         isolateModel.name = "isolateModel";
-        var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 1, transparent: true });
-        var g1Material = new THREE.LineBasicMaterial({ color: 0x000099, opacity: 0.75, transparent: true });
-        try { isolateModel.children[0].material = g0Material; } catch (e) { }
-        try { isolateModel.children[1].material = g1Material; } catch (e) { }
+        // var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 1, transparent: true });
+        // var g1Material = new THREE.LineBasicMaterial({ color: 0x000099, opacity: 0.75, transparent: true });
+        try {
+            isolateModel.children[0].material.color.setHex(0x888888);
+            isolateModel.children[0].material.opacity = 1;
+        } catch (e) { }
+        try {
+            isolateModel.children[1].material.color.setHex(0x000099);
+            isolateModel.children[1].material.opacity = 0.75;
+        } catch (e) { }
         //add points
         //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
         var pMaterial = new THREE.PointsMaterial({
@@ -520,17 +547,23 @@ function fxisolationMode(range) {
             opacity: 1, // 设置透明度
             transparent: true // 开启透明度
         });
-        try {
-            var point0 = new THREE.Points(isolateModel.children[0].geometry, pMaterial);
-            point0.name = "g0points";
-            isolateModel.add(point0);
-        } catch (e) { };
+        var g0MergedGeometry = new THREE.Geometry();
+        var g1MergedGeometry = new THREE.Geometry();
+        // 将geometry1和geometry2合并到mergedGeometry中
+        isolateModel.traverse(function (child) {
+            if (child.name.includes("g0")) {
+                g0MergedGeometry.merge(child.geometry);
+            } else if (child.name.includes("g1")) {
+                g1MergedGeometry.merge(child.geometry);
+            }
+        });
+        var point0 = new THREE.Points(g0MergedGeometry, pMaterial);
+        point0.name = "g0points";
+        var point1 = new THREE.Points(g1MergedGeometry, pMaterial);
+        point1.name = "g1points";
+        isolateModel.add(point0);
+        isolateModel.add(point1);
 
-        try {
-            var point1 = new THREE.Points(isolateModel.children[1].geometry, pMaterial);
-            point1.name = "g1points";
-            isolateModel.add(point1);
-        } catch (e) { };
         tGcode.renderOrder = 3;
         isolateModel.renderOrder = 2;
         cursor3D.visible = true;
@@ -572,7 +605,23 @@ function bt_open() {
     };
     fileInput.click();
 }
+function bt_copy() {
+    //copy to clipboard
 
+    if (selectedLineContent === undefined || selectedLineContent === "") {
+        alert("No code to copy!");
+        return;
+    }
+    navigator.clipboard.writeText(selectedLineContent)
+        .then(() => {
+            console.log('Text copied to clipboard');
+        })
+        .catch(err => {
+            // This can happen if the user denies clipboard permissions:
+            console.error('Could not copy text: ', err);
+        });
+
+}
 function read_file(file) {
     //read file content
     if (file === undefined) {
@@ -600,8 +649,28 @@ function read_file(file) {
     reader.readAsBinaryString(file);
 }
 function bt_save() {
+    if ((gCode === "" && sTl === "") || (gCode === undefined && sTl === undefined)) {
+        alert("No code to save!");
+        return;
+    }
     var blob = new Blob([txar.getValue()], { type: "text/plain;charset=utf-8" });
-    saveAs(blob, "gcode.txt");
+    // 创建一个新的URL，它代表了Blob对象的地址
+    let url = URL.createObjectURL(blob);
+    // 创建一个新的a标签
+    let a = document.createElement('a');
+    // 设置a标签的href属性为Blob对象的地址
+    a.href = url;
+    // 设置a标签的download属性为文件的名字
+    a.download = "code." + type.toLowerCase();
+    // 将a标签添加到文档中
+    document.body.appendChild(a);
+    // 模拟用户点击a标签
+    a.click();
+    // 在a标签被点击后，从文档中移除它
+    document.body.removeChild(a);
+    // 释放Blob对象的地址
+    URL.revokeObjectURL(url);
+
 }
 function gCodeClear() {
     if (gCode != undefined) {
@@ -1089,15 +1158,14 @@ function readUInt32LE(binaryStr, offset) {
         (binaryStr.charCodeAt(offset + 3) << 24)) >>> 0;
 }
 
-var isASCII = false;
 function loadModle(contents, type) {
     var geometry;
     if (type == "GCODE") {
-        gCode = parseGcode(contents, 0, 0, 0, 0);
-        var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
-        var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
-        gCode.children[0].material = g0Material;
-        gCode.children[1].material = g1Material;
+        gCode = parseGcode(contents, 0, 0, 0, 0, 0, "G0");
+        // var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
+        // var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
+        // gCode.children[0].material = g0Material;
+        // gCode.children[1].material = g1Material;
         //add points
         //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
         var pMaterial = new THREE.PointsMaterial({
@@ -1108,9 +1176,19 @@ function loadModle(contents, type) {
             opacity: 0.75, // 设置透明度
             transparent: true // 开启透明度
         });
-        var point0 = new THREE.Points(gCode.children[0].geometry, pMaterial);
+        var g0MergedGeometry = new THREE.Geometry();
+        var g1MergedGeometry = new THREE.Geometry();
+        // 将geometry1和geometry2合并到mergedGeometry中
+        gCode.traverse(function (child) {
+            if (child.name.includes("g0")) {
+                g0MergedGeometry.merge(child.geometry);
+            } else if (child.name.includes("g1")) {
+                g1MergedGeometry.merge(child.geometry);
+            }
+        });
+        var point0 = new THREE.Points(g0MergedGeometry, pMaterial);
         point0.name = "g0points";
-        var point1 = new THREE.Points(gCode.children[1].geometry, pMaterial);
+        var point1 = new THREE.Points(g1MergedGeometry, pMaterial);
         point1.name = "g1points";
         gCode.add(point0);
         gCode.add(point1);
@@ -1222,25 +1300,24 @@ function render() {
     cubeControls.update();
 }
 
-var isDragging = false;
-
 function parseSTL(contents) {
     var geometry = new THREE.STLLoader().parse(contents);
     return geometry;
 }
 
-function parseGcode(contents, x, y, z, a) {
+function parseGcode(contents, x, y, z, a, lineNumber, pre) {
     var lines = contents.split('\n');
 
     var geometries = new THREE.Group();
     geometries.name = "GCODE";
     //var x = 0, y = 0, z = 0, a = 0; // 增加a变量来保存A轴的值
     //var oldx = 0, oldy = 0, oldz = 0, olda = 0; // 增加a变量来保存A轴的值
-    var oldx = x, oldy = y, oldz = z, olda = a; // 增加a变量来保存A轴的值
-    var oldCode = "G0";
+    var oldx = x, oldy = y, oldz = z, olda = a, oldLineNum = lineNumber; // 增加a变量来保存A轴的值
+    var oldCode = pre;
     var g0Geometry = new THREE.Geometry(); // g0路径的几何体
     var g1Geometry = new THREE.Geometry(); // g1路径的几何体
-
+    var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
+    var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim();
 
@@ -1262,35 +1339,59 @@ function parseGcode(contents, x, y, z, a) {
                 }
             }
             //if(i == 100){console.log(line);}
-            var pt = new THREE.Vector3(x, y, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
-            pt.name = "l" + i;
+            var pt = new THREE.Vector3(x, y, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), a);// 在顶点上应用旋转
             if (line.startsWith('G0')) {
                 if (oldCode === "G1") {
-                    g0Geometry.vertices.push(new THREE.Vector3(oldx, oldy, oldz).applyAxisAngle(new THREE.Vector3(0, 1, 0), olda)); // 在顶点上应用旋转
+                    if (g1Geometry.vertices.length > 0) {
+                        g1Geometry.vertices.pop();
+                    }
+                    var tpt = new THREE.Vector3(oldx, oldy, oldz).applyAxisAngle(new THREE.Vector3(0, 1, 0), olda);
+                    tpt.name = "1G" + oldLineNum;
+                    g0Geometry.vertices.push(tpt); // 在顶点上应用旋转
                 }
-                g0Geometry.vertices.push(pt); // 在顶点上应用旋转
+                pt.name = "0G" + (i + lineNumber);
+                g0Geometry.vertices.push(pt); //前一段线的终点
+                g0Geometry.vertices.push(pt); //后一段线的起点
                 oldCode = "G0";
             } else if (line.startsWith('G1')) {
                 if (oldCode === "G0") {
-                    g1Geometry.vertices.push(new THREE.Vector3(oldx, oldy, oldz).applyAxisAngle(new THREE.Vector3(0, 1, 0), olda)); // 在顶点上应用旋转
+                    if (g0Geometry.vertices.length > 0) {
+                        g0Geometry.vertices.pop();
+                    }
+                    var tpt = new THREE.Vector3(oldx, oldy, oldz).applyAxisAngle(new THREE.Vector3(0, 1, 0), olda);
+                    tpt.name = "0G" + oldLineNum;
+                    g1Geometry.vertices.push(tpt); // 在顶点上应用旋转
                 }
-                g1Geometry.vertices.push(pt); // 在顶点上应用旋转
+                pt.name = "1G" + (i + lineNumber);
+                g1Geometry.vertices.push(pt); //前一段线的终点
+                g1Geometry.vertices.push(pt); //后一段线的起点
                 oldCode = "G1";
             }
             oldx = x;
             oldy = y;
             oldz = z;
             olda = a;
-
+            oldLineNum = i + lineNumber;
         }
     }
+//头对齐
+   // while (g0Geometry.vertices[1] !== g0Geometry.vertices[2]) { g0Geometry.vertices.shift(); }
+    while (g1Geometry.vertices[1] !== g1Geometry.vertices[2]) { g1Geometry.vertices.shift(); }
+//尾对齐
+    if (g0Geometry.vertices[g0Geometry.vertices.length - 1] === g0Geometry.vertices[g0Geometry.vertices.length - 2]) {
+        g0Geometry.vertices.pop();
+    }
+    if (g1Geometry.vertices[g1Geometry.vertices.length - 1] === g1Geometry.vertices[g1Geometry.vertices.length - 2]) {
+        g1Geometry.vertices.pop();
+    }
+// 创建线条模型
     if (g0Geometry.vertices.length > 0) {
-        var line0 = new THREE.Line(g0Geometry);
+        var line0 = new THREE.LineSegments(g0Geometry, g0Material, THREE.LineStrip);
         line0.name = "g0lines";
         geometries.add(line0);
     }
     if (g1Geometry.vertices.length > 0) {
-        var line1 = new THREE.Line(g1Geometry);
+        var line1 = new THREE.LineSegments(g1Geometry, g1Material, THREE.LineStrip);
         line1.name = "g1lines";
         geometries.add(line1);
     }
@@ -1344,9 +1445,6 @@ function autoMagnify() {
     cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
     cubeCamera.lookAt(0, 0, 0);
 }
-
-var supressMain = false;
-var supressCube = false;
 
 function calculatePoint3(movePoint, followPoint) {
     var distance = followPoint.distanceTo(new THREE.Vector3(0, 0, 0));
