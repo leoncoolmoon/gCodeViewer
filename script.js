@@ -229,7 +229,7 @@ window.addEventListener('click', function onClick(event) {
         for (var i = 0; i < intersects.length; i++) {
             var intersect = intersects[i];
             if (intersect.object.type === 'LineSegments') {
-                var delta = 0.1;
+                var delta = 0.05;
                 var x = intersect.point.x;
                 var y = intersect.point.y;
                 var z = intersect.point.z;
@@ -300,15 +300,15 @@ function getCordinats(line, forward) {
             var part = parts[j];
             var t = parseFloat(part.substring(1));
             if (isNaN(t)) { continue; }
-            if (part.startsWith('X')) {
+            if (part.startsWith('X') || part.startsWith('x')) {
                 x = x === undefined ? t : x;
-            } else if (part.startsWith('Y')) {
+            } else if (part.startsWith('Y') || part.startsWith('y')) {
                 y = y === undefined ? t : y;
-            } else if (part.startsWith('Z')) {
+            } else if (part.startsWith('Z') || part.startsWith('z')) {
                 z = z === undefined ? t : z;
-            } else if (part.startsWith('E')) {
+            } else if (part.startsWith('E') || part.startsWith('e')) {
                 e = e === undefined ? t : z;
-            } else if (part.startsWith('A')) { // 处理A轴的值
+            } else if (part.startsWith('A') || part.startsWith('a')) { // 处理A轴的值
                 a = a == 0 ? t : a;
             }
         }
@@ -581,15 +581,15 @@ function markLine(lineNumber, fromViewer) {
         }
     }
     var locArray = getCordinats(lineNumber, true);
-    var center = new THREE.Vector3(locArray.x, locArray.y, locArray.z);//.applyAxisAngle(new THREE.Vector3(0, 1, 0), locArray.a);
+    var center = new THREE.Vector3(locArray.x, locArray.y, locArray.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), locArray.a);
     if (center === undefined) {
         return;
     }
     if (mark !== undefined) {
         mark.clear();
     }
-    var start = txar.posFromIndex(txar.indexFromPos({ line: lineNumber - 1, ch: 0 })); // 行的起始位置
-    var end = txar.posFromIndex(txar.indexFromPos({ line: lineNumber, ch: 0 })); // 行的结束位置
+    var start = txar.posFromIndex(txar.indexFromPos({ line: lineNumber, ch: 0 })); // 行的起始位置
+    var end = txar.posFromIndex(txar.indexFromPos({ line: lineNumber +1, ch: 0 })); // 行的结束位置
     mark = txar.markText(start, end, { className: "highlighted-line" });
     cursor3D.visible = true;
     cursor3D.position.set(center.x, center.y, center.z);
@@ -705,16 +705,18 @@ function bt_state() {
     var state = document.getElementById('state');
     if (state.innerHTML == "stateShow") {
         state.innerHTML = "stateHide";
-        stats.dom.parentNode.style.display = "none";
-        document.getElementById('stats-container').style.display = "none";
-    } else {
-        state.innerHTML = "stateShow";
         stats.dom.parentNode.style.display = "block";
         document.getElementById('stats-container').style.display = "block";
+    } else {
+        state.innerHTML = "stateShow";
+        stats.dom.parentNode.style.display = "none";
+        document.getElementById('stats-container').style.display = "none";
     }
 
 
 }
+bt_state();
+
 function bt_codeviewer() {
     var codeviewer = document.getElementById('codeViewer');
 
@@ -1327,13 +1329,13 @@ function parseGcode(contents, x, y, z, a, lineNumber, pre) {
                 var part = parts[j];
                 var t = parseFloat(part.substring(1));
                 if (isNaN(t)) { continue; }
-                if (part.startsWith('X')) {
+                if (part.startsWith('X') || part.startsWith('x')) {
                     x = t;
-                } else if (part.startsWith('Y')) {
+                } else if (part.startsWith('Y') || part.startsWith('y')) {
                     y = t;
-                } else if (part.startsWith('Z')) {
+                } else if (part.startsWith('Z') || part.startsWith('z')) {
                     z = t;
-                } else if (part.startsWith('A')) { // 处理A轴的值
+                } else if (part.startsWith('A') || part.startsWith('a')) { // 处理A轴的值
                     a = t;
                     // if(a = NaN){console.log(line);}
                 }
