@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
-
+    <meta charset="UTF-8">
 <head>
     <title>STL Gcode Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
     <style>
         body {
             margin: 0;
@@ -22,29 +24,52 @@
             font-weight: bold;
             /* 文本粗细 */
         }
+
+        #backIcon {
+            transform: rotate(180deg);
+        }
     </style>
+    <script>
+        const buttons = [
+    {id: 'openText', text: {en: 'Open', cn: '打开'}},
+    {id: 'saveText', text: {en: 'Save', cn: '保存'}},
+    {id: 'copyText', text: {en: 'Copy Selected Code', cn: '复制选中代码'}},
+    {id: 'clearText', text: {en: 'Clear', cn: '清空'}},
+    {id: 'regenerateText', text: {en: 'Regenerate', cn: '重新生成'}},
+    {id: 'stateShowText', text: {en: 'State Show', cn: '显示状态'}},
+    {id: 'stateHideText', text: {en: 'state Hide', cn: '隐藏状态'}},
+    {id: 'codeviewerText', text: {en: 'Code Viewer', cn: '代码查看器'}},
+    {id: 'fullscreenText', text: {en: 'Fullscreen', cn: '全屏'}},
+    {id: 'playText', text: {en: 'Play', cn: '播放'}},
+    {id: 'backText', text: {en: 'Back', cn: '后退'}},
+    {id: 'donateText', text: {en: '- Support Me!-', cn: '-支持我!-'}}
+];
+
+</script>
 </head>
 <!-- no scolling -->
 <!-- <body style="overflow: hidden;"> -->
 
 
 <body style="overflow: hidden;">
-<div id="menu" style="height: 5vh; width: 100vh;">
-<!-- add link: codeviewer, state, open, save, clear, regenerate-->
-    <button id="open" onclick="bt_open()">open</button>
-    <button id="save" onclick="bt_save()">save</button>
-    <button id="copy" onclick="bt_copy()">copySelectedCode</button>
-    <button id="clear" onclick="bt_clear()">clear</button>
-    <button id="regenerate" onclick="bt_regenerate()">regenerate</button>
-    <button id="state" onclick="bt_state()">stateHide</button>
-    <button id="codeviewer" onclick="bt_codeviewer()">codeviewer</button>
-    <button id="fullscreen" onclick="bt_fullscreen()">fullscreen</button>
-    <button id="play" onclick="play_pause()">play</button>
-    <button id="back" onclick="back_pause()">back</button>
-    <a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD" target="_blank"> 
-    <button id="donate" style="background-color: gold;"> - Support Me! -</button></a>
-   Authon: <a href="https://github.com/leoncoolmoon">@leoncoolmoon</a>
-<!--
+    <div id="menu" style="height: 5vh; width: 100vh;">
+        <!-- add link: codeviewer, state, open, save, clear, regenerate-->
+        <button id="open" onclick="bt_open()"><span id="openText">open</span><i class="fa fa-folder-open"></i></button>
+<button id="save" onclick="bt_save()"><span id="saveText">save</span><i class="fa fa-save"></i></button>
+<button id="copy" onclick="bt_copy()"><span id="copyText">Copy Selected Code</span><i class="fa fa-copy"></i></button>
+<button id="clear" onclick="bt_clear()"><span id="clearText">clear</span><i class="fa fa-trash"></i></button>
+<button id="regenerate" onclick="bt_regenerate()"><span id="regenerateText">regenerate</span><i class="fa fa-redo"></i></button>
+<button id="state" onclick="bt_state()"><span id="stateShowText">stateShow</span><i class="fa fa-tachometer-alt"></i></button>
+<button id="codeviewer" onclick="bt_codeviewer()"><span id="codeviewerText">codeviewer</span><i class="fa fa-code"></i></button>
+<button id="fullscreen" onclick="bt_fullscreen()"><span id="fullscreenText">fullscreen</span><i class="fa fa-expand"></i></button>
+<button id="play" onclick="play_pause()"><span id="playText">play</span><i class="fa fa-play"></i></button>
+<button id="back" onclick="back_pause()"><span id="backText">back</span><i class="fa fa-play" id="backIcon"></i></button>
+<a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD" target="_blank">
+<button id="donate" style="background-color: gold;"><span id="donateText">- Support Me!</span><i class="fa fa-heart"></i></button></a>
+
+Authon: <a href="https://github.com/leoncoolmoon">@leoncoolmoon</a>
+
+        <!--
    <label for="toolDiameter">toolDiameter(mm):</label>
     <input type="number" id="toolDiameter" value="2.5" step="0.1" min="0.1" max="1" onchange="toolDiameterChange()">
     <label for="toolType">toolType:</label>
@@ -56,10 +81,10 @@
 -->
 
 
-</div>
+    </div>
     <div>
-    <div id="3dViewer"></div>
-    <div id="cordinates" style="
+        <div id="3dViewer"></div>
+        <div id="cordinates" style="
         color: antiquewhite;  
         display: flex; 
         /* background:black;  */
@@ -78,25 +103,38 @@
             <div id="e">E: 0</div>
             <div id="a">A: 0</div>
         </div>
-    <div id="codeViewer" >
-        <div id="codeEditor" style="height: 95vh;">
-            <textarea id='txar'>code will be displaied here</textarea>
+        <div id="codeViewer">
+            <div id="codeEditor" style="height: 95vh;">
+                <textarea id='txar'>code will be displaied here</textarea>
+            </div>
         </div>
-    </div>
-    <div id="divider" style="
+        <div id="divider" style="
     cursor: col-resize;
     "></div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
-    <script src="https://cdn.rawgit.com/mrdoob/three.js/r110/examples/js/loaders/STLLoader.js"></script>
-    <script src="OrbitControls.js"></script>
-    <script src="stats.min.js"></script>
-
-    <link rel="stylesheet" href="codemirror.css" />
-    <script src="codemirror.js"></script>
-    <script src="gcode_mode.js"></script>
-
-    <script src="script.js"></script>
+   
 </body>
+<script>
 
+    // 检查浏览器语言
+    const isChinese = navigator.language.startsWith('zh');
+    
+    // 更新按钮文本
+    buttons.forEach(button => {
+        const btn = document.getElementById(button.id);
+        if(btn) {
+            btn.textContent = isChinese ? button.text.cn : button.text.en;
+        }
+    });
+    </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+<script src="https://cdn.rawgit.com/mrdoob/three.js/r110/examples/js/loaders/STLLoader.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="stats.min.js"></script>
+
+<link rel="stylesheet" href="codemirror.css" />
+<script src="codemirror.js"></script>
+<script src="gcode_mode.js"></script>
+
+<script src="script.js"></script>
 </html>

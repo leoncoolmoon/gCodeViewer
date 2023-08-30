@@ -702,18 +702,21 @@ function bt_regenerate() {
     loadModle(contents, type);
 }
 function bt_state() {
-    var state = document.getElementById('state');
-    if (state.innerHTML == "stateShow") {
-        state.innerHTML = "stateHide";
+    var state = document.getElementById('stateShowText');
+    var isChinese = navigator.language.startsWith('zh');
+    const stateHideObj = buttons.find(button => button.id === 'stateHideText');
+    const stateShowObj = buttons.find(button => button.id === 'stateShowText');
+    const stateHide = isChinese ? stateHideObj.text.cn : stateHideObj.text.en;
+    const stateShow = isChinese ? stateShowObj.text.cn : stateShowObj.text.en;
+    if (state.textContent == stateShow) {
+        state.textContent = stateHide;
         stats.dom.parentNode.style.display = "block";
         document.getElementById('stats-container').style.display = "block";
     } else {
-        state.innerHTML = "stateShow";
+        state.textContent = stateShow;
         stats.dom.parentNode.style.display = "none";
         document.getElementById('stats-container').style.display = "none";
     }
-
-
 }
 bt_state();
 
