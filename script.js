@@ -8,7 +8,7 @@ var plainTextFile = "tap,gcode,nc,mpt,mpf";
 var STL = "stl";
 var mark;
 var timer;
-var divider, dividerPos;
+var divider, dividerPos, menu, codeViewer, statsContainer, v;
 var type = "UNKNOWN";
 var codeMirrorStartSellecting = false;
 var isDragging = false;
@@ -182,7 +182,7 @@ function disableKeyboardInput() {
 window.addEventListener('resize', function onWindowResize() {
     // 调整渲染器大小
     var aspect = window.innerWidth / window.innerHeight;
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    //renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     cubeCamera.aspect = 1;
@@ -190,6 +190,20 @@ window.addEventListener('resize', function onWindowResize() {
     cubeRenderer.setSize(150, 150);
     cubeRenderer.render(cubeScene, cubeCamera);
     cubeControls.update();
+    initSettops();
+
+    var fullscreen = document.getElementById('fullscreenText');
+    var isChinese = navigator.language.startsWith('zh');
+    const fullscreenObj = buttons.find(button => button.id === 'fullscreenText');
+    const exitfullscreenObj = buttons.find(button => button.id === 'exitFullscreenText');
+    const fullscreenText = isChinese ? fullscreenObj.text.cn : fullscreenObj.text.en;
+    const exitfullscreenText = isChinese ? exitfullscreenObj.text.cn : exitfullscreenObj.text.en;
+    if (document.fullscreenElement) {
+        fullscreen.textContent = exitfullscreenText;
+    } else {
+        fullscreen.textContent = fullscreenText;
+    }
+
 }, false);
 
 // 监听拖放事件
@@ -734,11 +748,17 @@ function bt_codeviewer() {
 
 }
 function bt_fullscreen() {
-    var fullscreen = document.getElementById('fullscreen');
-    if (fullscreen.innerHTML == "fullscreen") {
-        fullscreen.innerHTML = "exit fullscreen";
+    var fullscreen = document.getElementById('fullscreenText');
+    var isChinese = navigator.language.startsWith('zh');
+    const fullscreenObj = buttons.find(button => button.id === 'fullscreenText');
+    const exitfullscreenObj = buttons.find(button => button.id === 'exitFullscreenText');
+    const fullscreenText = isChinese ? fullscreenObj.text.cn : fullscreenObj.text.en;
+    const exitfullscreenText = isChinese ? exitfullscreenObj.text.cn : exitfullscreenObj.text.en;
+
+    if (fullscreen.textContent === fullscreenText) {
+        fullscreen.textContent = exitfullscreenText;
         var element = document.documentElement;
-        if (element.requestFullscreen) {
+        if (element.requestFullscreen == fullscreenObj) {
             element.requestFullscreen();
 
         } else if (element.mozRequestFullScreen) {
@@ -752,7 +772,7 @@ function bt_fullscreen() {
 
         }
     } else {
-        fullscreen.innerHTML = "fullscreen";
+        fullscreen.textContent = exitfullscreenText
         if (document.exitFullscreen) {
             document.exitFullscreen();
 
@@ -920,10 +940,20 @@ function init() {
     camera.up = new THREE.Vector3(0, 0, 1);
 
     renderer = new THREE.WebGLRenderer();//{ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    var codeViewer = document.getElementById('codeViewer');
+    //renderer.setSize(window.innerWidth, window.innerHeight);
+   
+    menu = document.getElementById('menu');
+    menu.style.position = 'absolute';
+    menu.style.top = '0px';
+    menu.style.left = '0px';
+    menu.style.width = '100%';
+    menu.style.background = 'rgba(0,0,0,1)';
+    menu.style.border = '1px solid white';
+    menu.style.zIndex = '100';
+    menu.style.color = 'white';
+
+    codeViewer = document.getElementById('codeViewer');
     codeViewer.style.position = 'absolute';
-    codeViewer.style.top = '5vh';
     codeViewer.style.left = '0px';
     codeViewer.style.width = '20%';
     codeViewer.style.height = '100%';
@@ -933,18 +963,16 @@ function init() {
     divider = document.getElementById('divider');
     divider.style.zIndex = '100';
     divider.style.position = 'absolute';
-    divider.style.top = '5vh';
     divider.style.left = codeViewer.style.width;
     divider.style.height = '95vh';
     divider.style.width = '0.5vw';
     //background-color: rgba(128,128,128,0.5);
     divider.style.background = 'rgba(128,128,128,0.5)';
-    var v = document.getElementById('3dViewer');
+    v = document.getElementById('3dViewer');
     v.style.position = 'absolute';
-    v.style.top = '5vh';
     v.style.left = '0px';
 
-    document.body.appendChild(renderer.domElement);
+   v.appendChild(renderer.domElement);
     // 添加环境光和点光
     var ambientLight = new THREE.AmbientLight(0xffffff);
     scene.add(ambientLight);
@@ -1023,7 +1051,6 @@ function init() {
     cubeContainer = document.createElement('div');
     cubeContainer.id = 'cube-container';
     cubeContainer.style.position = 'absolute';
-    cubeContainer.style.top = '10px';
     cubeContainer.style.right = '10px'
     cubeContainer.style.width = '150px';
     cubeContainer.style.height = '150px';
@@ -1093,20 +1120,17 @@ function init() {
     var cubeZAxis = new THREE.Line(cubeZAxisGeometry, cubeZAxisMaterial);
     cubeAxises.add(cubeZAxis);
     cubeScene.add(cubeAxises);
-    initMenu();
     initStats();
     initControl();
+    initSettops();
 }
-function initMenu() {
-    var menu = document.getElementById('menu');
-    menu.style.position = 'absolute';
-    menu.style.top = '0px';
-    menu.style.left = '0px';
-    menu.style.width = '100%';
-    menu.style.background = 'rgba(0,0,0,1)';
-    menu.style.border = '1px solid white';
-    menu.style.zIndex = '100';
-    menu.style.color = 'white';
+function initSettops() {
+    codeViewer.style.top = menu.getBoundingClientRect().height + 'px';
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    divider.style.top = codeViewer.style.top;
+    statsContainer.style.top  = codeViewer.style.top;
+    cubeContainer.style.top = codeViewer.style.top;
+    v.style.top = codeViewer.style.top;
 
 }
 
@@ -1131,11 +1155,10 @@ function createTextTexture(text) {
 //初始化性能插件
 function initStats() {
     stats = new Stats();
-    var statsContainer = document.createElement('div');
+    statsContainer = document.createElement('div');
     statsContainer.id = 'stats-container';
     statsContainer.name = 'stats-container';
     statsContainer.style.position = 'absolute';
-    statsContainer.style.top = '5vh';
     statsContainer.style.right = '0px';
     document.body.appendChild(statsContainer);
     statsContainer.appendChild(stats.dom);
@@ -1409,7 +1432,7 @@ function resetView() {
     camera.lookAt(0, 0, 0);
     camera.zoom = 1; // 重置摄像机缩放
     var aspect = window.innerWidth / window.innerHeight;
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    //renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     initControl();
@@ -1444,7 +1467,7 @@ function autoMagnify() {
 
     // 调整渲染器大小
     var aspect = window.innerWidth / window.innerHeight;
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    //renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));

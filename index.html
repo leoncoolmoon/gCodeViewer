@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+
 <head>
     <title>STL Gcode Viewer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
@@ -28,45 +29,69 @@
         #backIcon {
             transform: rotate(180deg);
         }
+
+        #menu {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        button {
+            flex-basis: 14vw;
+            /*margin: 1vw;*/
+            overflow: hidden;
+        }
     </style>
     <script>
         const buttons = [
-    {id: 'openText', text: {en: 'Open', cn: '打开'}},
-    {id: 'saveText', text: {en: 'Save', cn: '保存'}},
-    {id: 'copyText', text: {en: 'Copy Selected Code', cn: '复制选中代码'}},
-    {id: 'clearText', text: {en: 'Clear', cn: '清空'}},
-    {id: 'regenerateText', text: {en: 'Regenerate', cn: '重新生成'}},
-    {id: 'stateShowText', text: {en: 'State Show', cn: '显示状态'}},
-    {id: 'stateHideText', text: {en: 'state Hide', cn: '隐藏状态'}},
-    {id: 'codeviewerText', text: {en: 'Code Viewer', cn: '代码查看器'}},
-    {id: 'fullscreenText', text: {en: 'Fullscreen', cn: '全屏'}},
-    {id: 'playText', text: {en: 'Play', cn: '播放'}},
-    {id: 'backText', text: {en: 'Back', cn: '后退'}},
-    {id: 'donateText', text: {en: '- Support Me!-', cn: '-支持我!-'}}
-];
+            { id: 'openText', text: { en: 'Open', cn: '打开' } },
+            { id: 'saveText', text: { en: 'Save', cn: '保存' } },
+            { id: 'copyText', text: { en: 'Copy Selected Code', cn: '复制选中代码' } },
+            { id: 'clearText', text: { en: 'Clear', cn: '清空' } },
+            { id: 'regenerateText', text: { en: 'Regenerate', cn: '重新生成' } },
+            { id: 'stateShowText', text: { en: 'State Show', cn: '显示状态' } },
+            { id: 'stateHideText', text: { en: 'state Hide', cn: '隐藏状态' } },
+            { id: 'codeviewerText', text: { en: 'Code Viewer', cn: '代码查看器' } },
+            { id: 'fullscreenText', text: { en: 'Fullscreen', cn: '全屏' } },
+            { id: 'exitFullscreenText', text: { en: 'Exit Fullscreen', cn: '退出全屏' } },
+            { id: 'playText', text: { en: 'Play', cn: '播放' } },
+            { id: 'backText', text: { en: 'Back', cn: '后退' } },
+            { id: 'donateText', text: { en: '- Support Me!-', cn: '-支持我!-' } }
+        ];
 
-</script>
+    </script>
 </head>
+
 <body style="overflow: hidden;">
-    <div id="menu" style="height: 5vh; width: 100vh;">
-        <button id="open" onclick="bt_open()"><span id="openText">open</span><i class="fa fa-folder-open"></i></button>
-<button id="save" onclick="bt_save()"><span id="saveText">save</span><i class="fa fa-save"></i></button>
-<button id="copy" onclick="bt_copy()"><span id="copyText">Copy Selected Code</span><i class="fa fa-copy"></i></button>
-<button id="clear" onclick="bt_clear()"><span id="clearText">clear</span><i class="fa fa-trash"></i></button>
-<button id="regenerate" onclick="bt_regenerate()"><span id="regenerateText">regenerate</span><i class="fa fa-redo"></i></button>
-<button id="state" onclick="bt_state()"><span id="stateShowText">stateShow</span><i class="fa fa-tachometer-alt"></i></button>
-<button id="codeviewer" onclick="bt_codeviewer()"><span id="codeviewerText">codeviewer</span><i class="fa fa-code"></i></button>
-<button id="fullscreen" onclick="bt_fullscreen()"><span id="fullscreenText">fullscreen</span><i class="fa fa-expand"></i></button>
-<button id="play" onclick="play_pause()"><span id="playText">play</span><i class="fa fa-play"></i></button>
-<button id="back" onclick="back_pause()"><span id="backText">back</span><i class="fa fa-play" id="backIcon"></i></button>
-<a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD" target="_blank">
-<button id="donate" style="background-color: gold;"><span id="donateText">- Support Me!</span><i class="fa fa-heart"></i></button></a>
+    <div id="menu" style=" width: 100vh;">
+        <button id="open" onclick="bt_open()"><i class="fa fa-folder-open"></i><span id="openText">open</span></button>
+        <button id="save" onclick="bt_save()"><i class="fa fa-save"></i><span id="saveText">save</span></button>
+        <button id="copy" onclick="bt_copy()"><i class="fa fa-copy"></i><span id="copyText">Copy Selected
+                Code</span></button>
+        <button id="clear" onclick="bt_clear()"><i class="fa fa-trash"></i><span id="clearText">clear</span></button>
+        <button id="regenerate" onclick="bt_regenerate()"><i class="fa fa-redo"></i><span
+                id="regenerateText">regenerate</span></button>
+        <button id="state" onclick="bt_state()"><i class="fa fa-tachometer-alt"></i><span
+                id="stateShowText">stateShow</span></button>
+        <button id="codeviewer" onclick="bt_codeviewer()"><i class="fa fa-code"></i><span
+                id="codeviewerText">codeviewer</span></button>
+        <button id="fullscreen" onclick="bt_fullscreen()"><i class="fa fa-expand"></i><span
+                id="fullscreenText">fullscreen</span></button>
+        <button id="play" onclick="play_pause()"><i class="fa fa-play"></i><span id="playText">play</span></button>
+        <button id="back" onclick="back_pause()"><i class="fa fa-play" id="backIcon"></i><span
+                id="backText">back</span></button>
+        <a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD"
+            target="_blank">
+            <button id="donate" style="background-color: gold;"><i class="fa fa-heart"></i><span id="donateText">-
+                    Support Me!</span></button>
+        </a>
 
-Github: <a href="https://github.com/leoncoolmoon/gCodeViewer/">gCodeViewer</a>
+
+        Github: <a href="https://github.com/leoncoolmoon/gCodeViewer/">gCodeViewer</a>
 
 
 
-<!--
+        <!--
    <label for="toolDiameter">toolDiameter(mm):</label>
     <input type="number" id="toolDiameter" value="2.5" step="0.1" min="0.1" max="1" onchange="toolDiameterChange()">
     <label for="toolType">toolType:</label>
@@ -109,33 +134,28 @@ Github: <a href="https://github.com/leoncoolmoon/gCodeViewer/">gCodeViewer</a>
     cursor: col-resize;
     "></div>
     </div>
-   
+
 </body>
 <script>
 
     // 检查浏览器语言
     const isChinese = navigator.language.startsWith('zh');
-    
+
     // 更新按钮文本
     buttons.forEach(button => {
         const btn = document.getElementById(button.id);
-        if(btn) {
+        if (btn) {
             btn.textContent = isChinese ? button.text.cn : button.text.en;
         }
     });
-    </script>
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
 <script src="https://cdn.rawgit.com/mrdoob/three.js/r110/examples/js/loaders/STLLoader.js"></script>
 <script src="OrbitControls.js"></script>
 <script src="stats.min.js"></script>
-
 <link rel="stylesheet" href="codemirror.css" />
 <script src="codemirror.js"></script>
 <script src="gcode_mode.js"></script>
-
-<<<<<<< HEAD
 <script src="script.js"></script>
+
 </html>
-=======
-</html>
->>>>>>> 90ecf216e943519e7b660bef9fcd22bf69d4fd72
