@@ -154,7 +154,7 @@ function actionMove(e) {
     if (getTarget(e) === 'divider') {
         divider.style.background = 'rgba(64,128,200,0.5)';
     } else {
-        if (!isDragging) {
+        if (!isDragging && divider!==undefined) {
             divider.style.background = 'rgba(128,128,128,0.5)';
         }
     }

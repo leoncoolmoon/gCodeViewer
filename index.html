@@ -106,6 +106,46 @@
             color: gray;
             /* 灰色 */
         }
+        #myDiv {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            height: auto;
+            
+            /* background-color: lightgray; */
+            /* display: block; */
+            z-index: 100;
+            display: block;
+            justify-content: center;
+            align-items: center;
+        }        
+        #myDiv img {
+            max-width: 100%;
+            height: auto;
+            width: 25%;
+            margin: 5px;
+        }
+        #imageContainer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+
+
+    @media (orientation: portrait) {
+        #imageContainer {
+            flex-direction: column;
+        }
+    }
+
+    @media (orientation: landscape) {
+        #imageContainer {
+            flex-direction: row;
+        }
+    }
     </style>
     <script>
         const buttons = [
@@ -128,6 +168,17 @@
 </head>
 
 <body>
+    <div id="myDiv" onclick="this.style.display = 'none'">
+        <a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD" 
+        target="_blank" style = "color:beige; justify-content: center; display: grid; text-shadow: gray 0.1em 0.1em 0.2em;
+        ">Buy me a coffee!</a>
+        <div id="imageContainer">
+        <img src="alipay.jpg" alt="Image 1">
+        <img src="paypal.jpg" alt="Image 2">
+        <img src="wechat.png" alt="Image 3">
+        </div>
+        
+    </div>
     <div id="menu">
         <button id="open" onclick="bt_open()"><i class="fa fa-folder-open"></i><span id="openText">open</span></button>
         <button id="save" onclick="bt_save()"><i class="fa fa-save"></i><span id="saveText">save</span></button>
@@ -148,7 +199,7 @@
         <button id="github" onclick="window.open('https://github.com/leoncoolmoon/gCodeViewer/')">
             <i class="fab fa-github"></i><span id="githubText">Github</span> </button>
         <button id="donate" style="background-color: gold;"
-            onclick="window.open('https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD')""><i class="
+            onclick="document.getElementById('myDiv').style.display = 'block'"><i class="
             fa fa-heart"></i><span id="donateText">-
                 Support Me!</span></button>
 
