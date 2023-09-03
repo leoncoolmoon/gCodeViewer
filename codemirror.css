@@ -127,18 +127,18 @@
 .cm-s-default .cm-variable-2 {color: #05a;}
 .cm-s-default .cm-variable-3, .cm-s-default .cm-type {color: #085;}
 .cm-s-default .cm-comment {color: #a50;}
-.cm-s-default .cm-string {color: #a11;}
+.cm-s-default .cm-string {color: rgb(231, 186, 87);}
 .cm-s-default .cm-string-2 {color: #f50;}
 .cm-s-default .cm-meta {color: #555;}
 .cm-s-default .cm-qualifier {color: #555;}
 .cm-s-default .cm-builtin {color: #30a;}
 .cm-s-default .cm-bracket {color: #997;}
-.cm-s-default .cm-tag {color: #170;}
+.cm-s-default .cm-tag {color: rgb(111, 235, 89);}
 .cm-s-default .cm-attribute {color: #00c;}
 .cm-s-default .cm-hr {color: #999;}
 .cm-s-default .cm-link {color: #00c;}
 
-.cm-s-default .cm-error {color: #f00;}
+.cm-s-default .cm-error {color: rgb(247, 120, 120);}
 .cm-invalidchar {color: #f00;}
 
 .CodeMirror-composing { border-bottom: 2px solid; }

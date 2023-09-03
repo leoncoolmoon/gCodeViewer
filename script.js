@@ -15,7 +15,8 @@ var isDragging = false;
 var supressMain = false;
 var supressCube = false;
 var isASCII = false;
-
+var landscape = true;
+var cordinatesDiv = document.getElementById('cordinates');
 // 创建球体对象
 var cursor3D = new THREE.Group();
 cursor3D.name = "cursor";
@@ -45,90 +46,112 @@ cursor3D.add(new THREE.Points(cursor3DP, new THREE.PointsMaterial({
 var raycaster = new THREE.Raycaster();
 var mouse = new THREE.Vector2();
 var oldLineNum = 0;
-
-//cursor3D.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 })));
-cursor3D.visible = false;
-init();
-render();
-initStats();
-var txar = CodeMirror.fromTextArea(document.getElementById('txar'), {
-    lineNumbers: true,
-    mode: "gcode"
-});
 var isolateMode = false;
 var viewMode = 0;
-txar.on("cursorActivity", function () {
-    var cursor = txar.getCursor();
-    var lineNumber = cursor.line;// + 1; // 行号从0开始，所以需要加1
-    markLine(lineNumber, false);
-    // 将球体添加到场景中
-    if (codeMirrorStartSellecting) {
-        filterCmd();
-        codeMirrorStartSellecting = false;
-    } else {
-        fxisolationMode(isolateLayer(lineNumber));
-    }
-});
+//cursor3D.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 })));
+cursor3D.visible = false;
+var txar;
+window.onload = function() {
+    init();
+    render();
+    bt_state();
+    txar = CodeMirror.fromTextArea(document.getElementById('txar'), {
+        lineNumbers: true,
+        mode: "text/x-gcode",
+        keywords: ["G0", "G1", "G2", "G3", "G4", "G10", "G11", "G17", "G18", "G19", "G20", "G21", "G28", "G30", "G38.2", "G38.3", "G38.4", "G38.5", "G40", "G41", "G42", "G43", "G49", "G53", "G54", "G55", "G56", "G57", "G58", "G59", "G61", "G80", "G90", "G91", "G92", "G92.1", "G92.2", "G92.3", "G93", "G94", "G95", "G96", "G97", "G98", "G99", "M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "X","Y","Z","A","B","C","F","E"],
+        commentStart:";",
+        commentEnd:"",
+    });
 
-txar.on("mousedown", function (txar, event) {
-    codeMirrorStartSellecting = true;
-    console.log("mousedownT");
-});
+    //txar.refresh();
 
-txar.on("mouseup", function (txar, event) {
-    codeMirrorStartSellecting = false;
-    fxisolationMode();
-    console.log("mouseupT");
-});
-
-txar.on("keyup", function (txar, event) {
-    if (event.key === "Shift") {
-        // set a timmer delay here if in 1000ms shift key is not pressed then enter the isolation mode       
-        filterCmd();
-        console.log("Shift key was released");
-    }
-    if (event.key == "Escape") {
-        //exit isolation mode
-        fxisolationMode();
-        if (mark !== undefined) {
-            mark.clear();
+    txar.on("cursorActivity", function () {
+        var cursor = txar.getCursor();
+        var lineNumber = cursor.line;// + 1; // 行号从0开始，所以需要加1
+        markLine(lineNumber, false);
+        // 将球体添加到场景中
+        if (codeMirrorStartSellecting) {
+            filterCmd();
+            codeMirrorStartSellecting = false;
+        } else {
+            fxisolationMode(isolateLayer(lineNumber));
         }
-        console.log("Escape key was released");
-    }
-});
-//双击重置视角
-cubeRenderer.domElement.addEventListener('dblclick', function (event) {
-    resetView();
-});
-renderer.domElement.addEventListener('dblclick', function (event) {
-    autoMagnify();
-});
-//同步转动
-controls.addEventListener('change', function (event) {
-    if (!supressMain) {
-        cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
-        cubeCamera.lookAt(0, 0, 0);
-        supressCube = true;
-    }
-});
-cubeControls.addEventListener('change', function (event) {
-    if (!supressCube) {
-        camera.position.copy(calculatePoint3(cubeCamera.position, camera.position));
-        camera.lookAt(0, 0, 0);
-        supressMain = true;
-    }
-});
+    });
 
-document.addEventListener('mousedown', function (e) {
-    isDragging = e.target.id === 'divider';
+    txar.on("touchstart", txarActionStart);
+    txar.on("mousedown", txarActionStart);
+    function txarActionStart(txar, event) {
+        codeMirrorStartSellecting = true;
+        console.log("mousedownT");
+    }
+    txar.on("touchend", txarActionEnd);
+    txar.on("mouseup", txarActionEnd);
+    function txarActionEnd(txar, event) {
+        codeMirrorStartSellecting = false;
+        fxisolationMode();
+        console.log("mouseupT");
+    }
+    
+    txar.on("keyup", function (txar, event) {
+        if (event.key === "Shift") {
+            // set a timmer delay here if in 1000ms shift key is not pressed then enter the isolation mode       
+            filterCmd();
+            console.log("Shift key was released");
+        }
+        if (event.key == "Escape") {
+            //exit isolation mode
+            fxisolationMode();
+            if (mark !== undefined) {
+                mark.clear();
+            }
+            console.log("Escape key was released");
+        }
+    });
+    //双击重置视角
+    cubeRenderer.domElement.addEventListener('dblclick', function (event) {
+        resetView();
+    });
+    renderer.domElement.addEventListener('dblclick', function (event) {
+        autoMagnify();
+    });
+    //同步转动
+    controls.addEventListener('change', function (event) {
+        if (!supressMain) {
+            cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));
+            cubeCamera.lookAt(0, 0, 0);
+            supressCube = true;
+        }
+    });
+    cubeControls.addEventListener('change', function (event) {
+        if (!supressCube) {
+            camera.position.copy(calculatePoint3(cubeCamera.position, camera.position));
+            camera.lookAt(0, 0, 0);
+            supressMain = true;
+        }
+    });
+    menu.addEventListener('click', function (event) {
+        if(event.target.id === 'menu'){
+        menu.style.left = menu.style.left === '0%' ? '-98.5%' : '0%';
+    }
+    });
+
+}
+//initStats();
+
+document.addEventListener('touchstart', actionStart);
+document.addEventListener('mousedown', actionStart);
+function actionStart(e) {
+    isDragging = getTarget(e) === 'divider';
     divider.style.background = 'rgba(64,128,200,0.5)';
     // if (e.target.className.includes("CodeMirror")) {
     //     codeMirrorStartSellecting = true;
     //     console.log("mousedown");
     // }
-});
-document.addEventListener('mousemove', function (e) {
-    if (e.target.id === 'divider') {
+}
+document.addEventListener('touchmove', actionMove);
+document.addEventListener('mousemove', actionMove);
+function actionMove(e) {
+    if (getTarget(e) === 'divider') {
         divider.style.background = 'rgba(64,128,200,0.5)';
     } else {
         if (!isDragging) {
@@ -136,12 +159,21 @@ document.addEventListener('mousemove', function (e) {
         }
     }
     if (!isDragging) return;
-    document.getElementById('divider').style.left = e.x + 'px';
-    //console.log("left = " + e.x);
-    document.getElementById('codeViewer').style.width = e.x + 'px';
+    if (landscape) {
+        divider.style.left = ((e.touches && e.touches.length >= 1) ? e.touches[0].clientX : e.x) + 'px';
+        //console.log("left = " + e.x);
+        codeViewer.style.width = divider.style.left;
+    } else {
+        var y = (((e.touches && e.touches.length >= 1) ? e.touches[0].clientY : e.y));
+        divider.style.bottom = (window.innerHeight - y) + 'px';
+        //console.log("bottom = " + e.y);
+        codeViewer.style.height = divider.style.bottom;
+        codeViewer.style.top = y + 'px';
+    }
+
     //检查鼠标是否移出了目标元素
     var rect = e.target.getBoundingClientRect();
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+    if ((x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) && e.target.id === 'divider') {
         //console.log('Mouse moved out of target');
         isDragging = false;
         supressMain = false;
@@ -153,9 +185,10 @@ document.addEventListener('mousemove', function (e) {
         fxisolationMode();
         console.log("mouseupM");
     }
-});
-
-document.addEventListener('mouseup', function (e) {
+}
+document.addEventListener('touchend', actionEnd);
+document.addEventListener('mouseup', actionEnd);
+function actionEnd(e) {
     isDragging = false;
     supressMain = false;
     supressCube = false;
@@ -166,7 +199,7 @@ document.addEventListener('mouseup', function (e) {
         fxisolationMode();
         console.log("mouseup");
     }
-});
+}
 
 function disableKeyboardInput() {
     function disableEvent(event) {
@@ -181,10 +214,6 @@ function disableKeyboardInput() {
 //监听屏幕大小变化
 window.addEventListener('resize', function onWindowResize() {
     // 调整渲染器大小
-    var aspect = window.innerWidth / window.innerHeight;
-    //renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = aspect;
-    camera.updateProjectionMatrix();
     cubeCamera.aspect = 1;
     cubeCamera.updateProjectionMatrix();
     cubeRenderer.setSize(150, 150);
@@ -220,8 +249,8 @@ window.addEventListener('drop', function (event) {
 // 监听鼠标移动事件
 window.addEventListener('mousemove', function onMouseMove(event) {
     // 计算鼠标在屏幕上的位置
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    mouse.x = (event.clientX / document.documentElement.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY /document.documentElement.clientHeight) * 2 + 1;
     //console.log("x=" + mouse.x + " y=" + mouse.y);
 }, false);
 
@@ -300,6 +329,11 @@ window.addEventListener('click', function onClick(event) {
     }
 }, false);
 
+function getTarget(event) {
+    if (event.target.id != "") { return event.target.id; }
+    if (event.touches && event.touches[0].target.id != "") { return event.touches[0].target.id; }
+    return "";
+}
 //向前扫描获取当前三维坐标以及最近的z轴高度，向后可获取可能的安全z轴高度
 function getCordinats(line, forward) {
     var x, y, z, e, a = 0;
@@ -603,7 +637,7 @@ function markLine(lineNumber, fromViewer) {
         mark.clear();
     }
     var start = txar.posFromIndex(txar.indexFromPos({ line: lineNumber, ch: 0 })); // 行的起始位置
-    var end = txar.posFromIndex(txar.indexFromPos({ line: lineNumber +1, ch: 0 })); // 行的结束位置
+    var end = txar.posFromIndex(txar.indexFromPos({ line: lineNumber + 1, ch: 0 })); // 行的结束位置
     mark = txar.markText(start, end, { className: "highlighted-line" });
     cursor3D.visible = true;
     cursor3D.position.set(center.x, center.y, center.z);
@@ -725,27 +759,55 @@ function bt_state() {
     if (state.textContent == stateShow) {
         state.textContent = stateHide;
         stats.dom.parentNode.style.display = "block";
-        document.getElementById('stats-container').style.display = "block";
+        statsContainer.style.display = "block";
     } else {
         state.textContent = stateShow;
         stats.dom.parentNode.style.display = "none";
-        document.getElementById('stats-container').style.display = "none";
+        statsContainer.style.display = "none";
     }
 }
-bt_state();
+
 
 function bt_codeviewer() {
-    var codeviewer = document.getElementById('codeViewer');
-
-    if (divider.style.left === "0%" || divider.style.left === "0px") {
-        divider.style.left = dividerPos;
-        codeviewer.style.width = dividerPos;
-    } else {
-        dividerPos = divider.style.left;
-        divider.style.left = "0%";
-        codeviewer.style.width = "0%";
+    if (landscape) {//横屏
+        if (divider.style.left === "0%" || divider.style.left === "0px") {
+            //codeViewer is hidden need to show it
+            divider.style.left = dividerPos;
+        } else {//codeViewer is shown need to hide it
+            dividerPos = divider.style.left;
+            divider.style.left = "0%";
+        }
+        divider.style.top = menu.getBoundingClientRect().height + "px";
+        divider.style.bottom = "0%";
+    
+        codeViewer.style.width = divider.style.left;
+        codeViewer.style.top = divider.style.top;
+    } else {//竖屏
+        if (divider.style.bottom === "0%" || divider.style.bottom === "0px") {
+            //codeViewer is hidden need to show it
+            if (dividerPos.substring(dividerPos.length - 1) === '%') {
+                //divider.style.bottom 为百分值
+                divider.style.bottom = (parseFloat(dividerPos)) + '%';
+            }else {
+                //divider.style.bottom 为像素值
+                divider.style.bottom = (parseFloat(dividerPos) /document.documentElement.clientHeight) * 100 + '%';
+            }
+        } else {//codeViewer is shown need to hide it
+            if (divider.style.bottom.substring(divider.style.bottom.length - 1) === '%') {
+                //divider.style.bottom 为百分值
+                dividerPos = ( parseFloat(divider.style.bottom) ) + '%';
+            } else {
+                //divider.style.bottom 为像素值
+                dividerPos = Math.round(( parseFloat(divider.style.bottom) /document.documentElement.clientHeight)*100) + '%';
+            } 
+            divider.style.bottom = "0%";
+        }
+        codeViewer.style.width = "100%";
+        codeViewer.style.height = divider.style.bottom;
+        codeViewer.style.top = 'auto';
     }
-
+    codeViewer.style.bottom = '0%';
+    codeViewer.style.left = '0%';
 }
 function bt_fullscreen() {
     var fullscreen = document.getElementById('fullscreenText');
@@ -935,44 +997,66 @@ function init() {
     scene.add(cursor3D);
     // 调用函数禁用键盘输入
     disableKeyboardInput();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(75, document.documentElement.clientWidth /document.documentElement.clientHeight, 0.1, 1000);
+    console.log("init, width:" + document.documentElement.clientWidth + ",height:" +document.documentElement.clientHeight);
     camera.position.set(0, -200, 200);
     camera.up = new THREE.Vector3(0, 0, 1);
 
     renderer = new THREE.WebGLRenderer();//{ alpha: true });
-    //renderer.setSize(window.innerWidth, window.innerHeight);
-   
+    //renderer.setSize(document.documentElement.clientWidth,document.documentElement.clientHeight);
+    console.log('check1 width:' + document.documentElement.clientWidth + ' height:' +document.documentElement.clientHeight);
+    
     menu = document.getElementById('menu');
     menu.style.position = 'absolute';
     menu.style.top = '0px';
-    menu.style.left = '0px';
+    menu.style.left = '0%';
     menu.style.width = '100%';
     menu.style.background = 'rgba(0,0,0,1)';
     menu.style.border = '1px solid white';
     menu.style.zIndex = '100';
     menu.style.color = 'white';
 
+    console.log('check0 width:' + document.documentElement.clientWidth + ' height:' +document.documentElement.clientHeight);
+
     codeViewer = document.getElementById('codeViewer');
     codeViewer.style.position = 'absolute';
     codeViewer.style.left = '0px';
-    codeViewer.style.width = '20%';
-    codeViewer.style.height = '100%';
     //codeViewer.style.border = '1px solid white';
-    codeViewer.style.zIndex = '99';
+    codeViewer.style.zIndex = '98';
 
     divider = document.getElementById('divider');
-    divider.style.zIndex = '100';
+    divider.style.zIndex = '99';
     divider.style.position = 'absolute';
-    divider.style.left = codeViewer.style.width;
-    divider.style.height = '95vh';
-    divider.style.width = '0.5vw';
+    landscape = document.documentElement.clientWidth >document.documentElement.clientHeight;
+
+    if (landscape) {
+        codeViewer.style.width = '20%';
+        codeViewer.style.height = '100%';
+        codeViewer.style.top = menu.getBoundingClientRect().height + "px";
+        divider.style.top = codeViewer.style.top;
+        divider.style.left = codeViewer.style.width;
+        divider.style.bottom = '0px';
+        divider.style.height = '95%';
+        divider.style.width = '0.5%';
+
+    } else {
+        codeViewer.style.width = '100%';
+        codeViewer.style.height = '20%';
+        codeViewer.style.top = '80%';
+        divider.style.left = '0px';
+        divider.style.bottom = codeViewer.style.height;
+        divider.style.width = '100%';
+        divider.style.height = '1%';
+        divider.style.cursor = 'row-resize';
+
+    }
     //background-color: rgba(128,128,128,0.5);
     divider.style.background = 'rgba(128,128,128,0.5)';
     v = document.getElementById('3dViewer');
     v.style.position = 'absolute';
     v.style.left = '0px';
 
-   v.appendChild(renderer.domElement);
+    v.appendChild(renderer.domElement);
     // 添加环境光和点光
     var ambientLight = new THREE.AmbientLight(0xffffff);
     scene.add(ambientLight);
@@ -1120,18 +1204,127 @@ function init() {
     var cubeZAxis = new THREE.Line(cubeZAxisGeometry, cubeZAxisMaterial);
     cubeAxises.add(cubeZAxis);
     cubeScene.add(cubeAxises);
+
     initStats();
     initControl();
     initSettops();
 }
+var oldlandscape = landscape;
 function initSettops() {
-    codeViewer.style.top = menu.getBoundingClientRect().height + 'px';
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    divider.style.top = codeViewer.style.top;
-    statsContainer.style.top  = codeViewer.style.top;
-    cubeContainer.style.top = codeViewer.style.top;
-    v.style.top = codeViewer.style.top;
+    var aspect = document.documentElement.clientWidth /document.documentElement.clientHeight;
+    renderer.setSize(document.documentElement.clientWidth,document.documentElement.clientHeight);
+    console.log('width:' + document.documentElement.clientWidth + ' height:' +document.documentElement.clientHeight);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    var perc = 0;
+    oldlandscape = landscape;
+    if (document.documentElement.clientWidth >document.documentElement.clientHeight) {
+        // 横屏
+        landscape = true;
+        console.log('横屏');
+    } else {
+        // 竖屏
+        landscape = false;
+        console.log('竖屏');
+    }
+    cordinatesDiv.style = landscape? " bottom: 0; top:auto; ":" bottom: auto; top:0; ";
 
+    if (oldlandscape != landscape) {
+
+
+         //计算分割线百分比位置
+         if (dividerPos == undefined) {
+            dividerPos = '0%';
+        } else if (dividerPos.substring(dividerPos.length - 1) == '%') {
+            perc = parseFloat(dividerPos);
+        }
+        else if (dividerPos.substring(dividerPos.length - 2) == 'px') {
+            perc = (parseFloat(dividerPos.substring(0, dividerPos.length - 2)) /document.documentElement.clientHeight * 100);
+        }
+        if (landscape) {
+            //进入横屏
+            //判断是否隐藏coderViewer
+            if (dividerPos == '0px') {
+                //已显示
+                //计算原来分割线百分比位置divider.style.bottom / document.documentElement.clientHeight 
+                divider.style.left = Math.round(parseFloat(divider.style.bottom.substring(0, divider.style.bottom.length - 2)) /document.documentElement.clientHeight * document.documentElement.clientWidth * 100) + "px";
+                //dividerPos 不用更新
+            } else if (dividerPos == '0%') {
+                //已显示
+                //计算原来分割线百分比位置divider.style.left /  document.documentElement.clientWidth
+                if (divider.style.bottom.substring(divider.style.bottom.length - 1) == '%') {
+                    divider.style.left = Math.round(parseFloat(divider.style.bottom) * document.documentElement.clientWidth / 100) + "px";
+                } else {
+                    divider.style.left = Math.round(parseFloat(divider.style.bottom) / document.documentElement.clientWidth * 100) + "%";
+                }
+                //dividerPos 不用更新
+            } else {
+                //已隐藏
+                divider.style.left = '0%';
+                //转换分割线位置记录dividerPos
+                dividerPos = perc + '%';
+            }
+            //更新分割线位置
+            divider.style.top = menu.getBoundingClientRect().bottom + 'px';
+            divider.style.height = '95%';
+            divider.style.width = '0.5%';
+            divider.style.cursor = 'col-resize';
+            //更新codeViewer位置
+            codeViewer.style.top = divider.style.top;
+            codeViewer.style.left = 0;
+            codeViewer.style.height = divider.style.height;
+            codeViewer.style.width = divider.style.left;
+            //更新3dViewer位置
+            v.style.top = menu.getBoundingClientRect().bottom + 'px';
+           // v.style.left = '0%';
+            v.style.height = divider.style.height;
+          //  v.style.width = '100%';//(document.documentElement.clientWidth - dividerPos) + 'px';
+        } else {
+            //进入竖屏
+            //判断是否隐藏coderViewer
+            if (dividerPos == '0px') {
+                //已显示
+                //计算原来分割线百分比位置divider.style.left /  document.documentElement.clientWidth
+                divider.style.bottom = Math.round(((parseFloat(divider.style.left) / document.documentElement.clientWidth)) *document.documentElement.clientHeight * 100) + "px";
+                //dividerPos 不用更新
+            } else if (dividerPos == '0%') {
+                //已显示
+                //计算原来分割线百分比位置divider.style.bottom / document.documentElement.clientHeight 
+                if(divider.style.left.substring(divider.style.left.length - 1) == '%'){
+                divider.style.bottom = Math.round((parseFloat(divider.style.left) / 100) * document.documentElement.clientWidth) + "px";
+                }else{
+                    divider.style.bottom = Math.round((parseFloat(divider.style.left) /document.documentElement.clientHeight) * 100) + "%";
+                }
+                //dividerPos 不用更新
+            } else {
+                //已隐藏
+                divider.style.bottom = '0%';
+                //转换分割线位置记录dividerPos
+                dividerPos = perc + '%';
+            }
+            //更新分割线位置
+            divider.style.width = '100%';
+            divider.style.height = '0.5%';
+            divider.style.left = '0%';
+            divider.style.top = 'auto';
+            divider.style.cursor = 'row-resize';
+            //更新codeViewer位置
+            codeViewer.style.top = 'auto';
+            codeViewer.style.bottom = '0%';
+            codeViewer.style.left = '0%';
+            codeViewer.style.height = divider.style.bottom;
+            codeViewer.style.width = divider.style.width;
+            //更新3dViewer位置
+            v.style.top = menu.getBoundingClientRect().bottom + 'px';
+           // v.style.left = '0%';
+            v.style.height = divider.style.bottom;
+           // v.style.width = "100%";// divider.style.width;
+        }
+
+    }
+
+    statsContainer.style.top = v.style.top;
+    cubeContainer.style.top = v.style.top;
 }
 
 //创建一个名为createTextTexture()的函数，用于创建包含文本的纹理。
@@ -1163,7 +1356,9 @@ function initStats() {
     document.body.appendChild(statsContainer);
     statsContainer.appendChild(stats.dom);
     stats.domElement.style.position = 'relative';
-
+    stats.domElement.style.top = menu.getBoundingClientRect().height + 'px';    // 通过设置top属性，让性能插件显示在菜单下面的位置
+    statsContainer.style.top = stats.domElement.style.top;
+    
 }
 //初始化控制插件
 function initControl() {
@@ -1278,10 +1473,12 @@ function loadModle(contents, type) {
 function loadCode(contents, type, geometry) {
     if (type == "GCODE" || isASCII) {
         txar.setValue(contents);
+        txar.refresh();
     } else if (type == "STL") {
         // 将几何体转换为ASCII STL格式
         if (geometry != undefined) {
             txar.setValue(geometryToStlAscii(geometry));
+            txar.refresh();
         }
     }
 }
@@ -1402,17 +1599,17 @@ function parseGcode(contents, x, y, z, a, lineNumber, pre) {
             oldLineNum = i + lineNumber;
         }
     }
-//头对齐
-   // while (g0Geometry.vertices[1] !== g0Geometry.vertices[2]) { g0Geometry.vertices.shift(); }
+    //头对齐
+    // while (g0Geometry.vertices[1] !== g0Geometry.vertices[2]) { g0Geometry.vertices.shift(); }
     while (g1Geometry.vertices[1] !== g1Geometry.vertices[2]) { g1Geometry.vertices.shift(); }
-//尾对齐
+    //尾对齐
     if (g0Geometry.vertices[g0Geometry.vertices.length - 1] === g0Geometry.vertices[g0Geometry.vertices.length - 2]) {
         g0Geometry.vertices.pop();
     }
     if (g1Geometry.vertices[g1Geometry.vertices.length - 1] === g1Geometry.vertices[g1Geometry.vertices.length - 2]) {
         g1Geometry.vertices.pop();
     }
-// 创建线条模型
+    // 创建线条模型
     if (g0Geometry.vertices.length > 0) {
         var line0 = new THREE.LineSegments(g0Geometry, g0Material, THREE.LineStrip);
         line0.name = "g0lines";
@@ -1431,8 +1628,8 @@ function resetView() {
     camera.position.set(0, -200, 200);
     camera.lookAt(0, 0, 0);
     camera.zoom = 1; // 重置摄像机缩放
-    var aspect = window.innerWidth / window.innerHeight;
-    //renderer.setSize(window.innerWidth, window.innerHeight);
+    var aspect = document.documentElement.clientWidth /document.documentElement.clientHeight;
+    //renderer.setSize(document.documentElement.clientWidth,document.documentElement.clientHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     initControl();
@@ -1466,8 +1663,8 @@ function autoMagnify() {
     camera.updateProjectionMatrix();
 
     // 调整渲染器大小
-    var aspect = window.innerWidth / window.innerHeight;
-    //renderer.setSize(window.innerWidth, window.innerHeight);
+    var aspect = document.documentElement.clientWidth /document.documentElement.clientHeight;
+    //renderer.setSize(document.documentElement.clientWidth,document.documentElement.clientHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     cubeCamera.position.copy(calculatePoint3(camera.position, cubeCamera.position));

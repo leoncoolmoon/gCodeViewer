@@ -9,6 +9,8 @@
     <style>
         body {
             margin: 0;
+            overflow: hidden;
+            background: black;
         }
 
         canvas {
@@ -34,12 +36,75 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-start;
+            width: 100vh;
+            left: 0%;
+        }
+
+        #cordinates {
+            color: antiquewhite;
+            display: flex;
+            /* background:black;  */
+            /* border: 1px solid white;  */
+            height: 30%;
+            flex-direction: column;
+            justify-content: space-evenly;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 10%;
+            z-index: 101;
+            padding: 1%;
+            text-shadow: gray 0.2em 0.1em 0.2em;
+        }
+
+        #divider {
+            cursor: col-resize;
+        }
+
+        #codeEditor {
+            height: 95vh;
         }
 
         button {
             flex-basis: 14vw;
             /*margin: 1vw;*/
             overflow: hidden;
+            font-size: 1.5vh;
+            padding-top: 0.25vh;
+            padding-bottom: 0.25vh;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        i {
+            margin-right: 0.5vw;
+        }
+
+        /*for high light gcode*/
+        .tag {
+            color: rgb(105, 219, 77);
+            /* 浅绿色 */
+        }
+
+        .string {
+            color: purple;
+            /* 浅紫色 */
+        }
+
+        .coordinate-name {
+            color: white;
+            /* 白色 */
+        }
+
+        .coordinate-value {
+            color: rgb(236, 146, 146);
+            /* 浅红色 */
+        }
+
+        .meta {
+            color: gray;
+            /* 灰色 */
         }
     </style>
     <script>
@@ -56,14 +121,14 @@
             { id: 'exitFullscreenText', text: { en: 'Exit Fullscreen', cn: '退出全屏' } },
             { id: 'playText', text: { en: 'Play', cn: '播放' } },
             { id: 'backText', text: { en: 'Back', cn: '后退' } },
-            { id: 'donateText', text: { en: '- Support Me!-', cn: '-支持我!-' } }
+            { id: 'donateText', text: { en: '- Support Me!-', cn: '-打赏!-' } }
         ];
 
     </script>
 </head>
 
-<body style="overflow: hidden;">
-    <div id="menu" style=" width: 100vh;">
+<body>
+    <div id="menu">
         <button id="open" onclick="bt_open()"><i class="fa fa-folder-open"></i><span id="openText">open</span></button>
         <button id="save" onclick="bt_save()"><i class="fa fa-save"></i><span id="saveText">save</span></button>
         <button id="copy" onclick="bt_copy()"><i class="fa fa-copy"></i><span id="copyText">Copy Selected
@@ -80,14 +145,12 @@
         <button id="play" onclick="play_pause()"><i class="fa fa-play"></i><span id="playText">play</span></button>
         <button id="back" onclick="back_pause()"><i class="fa fa-play" id="backIcon"></i><span
                 id="backText">back</span></button>
-        <a href="https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD"
-            target="_blank">
-            <button id="donate" style="background-color: gold;"><i class="fa fa-heart"></i><span id="donateText">-
-                    Support Me!</span></button>
-        </a>
-
-
-        Github: <a href="https://github.com/leoncoolmoon/gCodeViewer/">gCodeViewer</a>
+        <button id="github" onclick="window.open('https://github.com/leoncoolmoon/gCodeViewer/')">
+            <i class="fab fa-github"></i><span id="githubText">Github</span> </button>
+        <button id="donate" style="background-color: gold;"
+            onclick="window.open('https://www.paypal.com/donate/?business=9PUV2MQ58PM8A&no_recurring=1&item_name=Thanks+for+supporting+my+work&currency_code=AUD')""><i class="
+            fa fa-heart"></i><span id="donateText">-
+                Support Me!</span></button>
 
 
 
@@ -106,33 +169,19 @@
     </div>
     <div>
         <div id="3dViewer"></div>
-        <div id="cordinates" style="
-        color: antiquewhite;  
-        display: flex; 
-        /* background:black;  */
-        /* border: 1px solid white;  */
-        height: 30%;
-        flex-direction: column;
-        justify-content: space-evenly;
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        width: 10%;
-        ">
-            <div id="x">X: 0</div>
-            <div id="y">Y: 0</div>
-            <div id="z">Z: 0</div>
-            <div id="e">E: 0</div>
-            <div id="a">A: 0</div>
+        <div id="cordinates" >
+            <div id="x" style="color: #f7abab;">X: 0</div>
+            <div id="y" style="color: #abf7ab;">Y: 0</div>
+            <div id="z" style="color: #ababf7;">Z: 0</div>
+            <div id="e" style="color: #e2abf7;">E: 0</div>
+            <div id="a" style="color: #ecf7ab;">A: 0</div>
         </div>
         <div id="codeViewer">
-            <div id="codeEditor" style="height: 95vh;">
+            <div id="codeEditor">
                 <textarea id='txar'>code will be displaied here</textarea>
             </div>
         </div>
-        <div id="divider" style="
-    cursor: col-resize;
-    "></div>
+        <div id="divider"></div>
     </div>
 
 </body>
