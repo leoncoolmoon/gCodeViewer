@@ -1,6 +1,7 @@
 
 var cubeRenderer, cubeScene, cubeMesh, cubeCamera, cubeControls, cubeContainer, cubeCamZ, cubeCamY, cubeCamX;
 var renderer, scene, camera, controls, stats, CamZ, CamY, CamX;
+var sampleCube;
 var isDragging = false;
 var axises, cubeAxises, gCode, tGcode, sTl, isolateModel = new THREE.Group();
 var selectedLineContent;
@@ -679,6 +680,7 @@ function read_file(file) {
         alert("file size is too big");
         return;
     }
+    scene.remove(sampleCube);
     if (gCode !== undefined) {
         gCodeClear();
         txar.setValue("");
@@ -998,7 +1000,7 @@ function init() {
     // 调用函数禁用键盘输入
     disableKeyboardInput();
     camera = new THREE.PerspectiveCamera(75, document.documentElement.clientWidth /document.documentElement.clientHeight, 0.1, 1000);
-    console.log("init, width:" + document.documentElement.clientWidth + ",height:" +document.documentElement.clientHeight);
+    //console.log("init, width:" + document.documentElement.clientWidth + ",height:" +document.documentElement.clientHeight);
     camera.position.set(0, -200, 200);
     camera.up = new THREE.Vector3(0, 0, 1);
 
@@ -1016,7 +1018,7 @@ function init() {
     menu.style.zIndex = '100';
     menu.style.color = 'white';
 
-    console.log('check0 width:' + document.documentElement.clientWidth + ' height:' +document.documentElement.clientHeight);
+    //console.log('check0 width:' + document.documentElement.clientWidth + ' height:' +document.documentElement.clientHeight);
 
     codeViewer = document.getElementById('codeViewer');
     codeViewer.style.position = 'absolute';
@@ -1128,7 +1130,32 @@ function init() {
     axises.add(coneZMesh);
 
     scene.add(axises);
-
+//创建实例矩形
+var loader = new THREE.TextureLoader();
+loader.setCrossOrigin('anonymous');
+var textures = [
+  loader.load('alipay.jpg'),
+  loader.load('paypal.jpg'),
+  loader.load('wechat.jpg')
+];
+// var texture = loader.load('alipay.jpg', function(texture) {
+//     console.log('Texture loaded');
+//   }, undefined, function(error) {
+//     console.log('Error loading texture:', error);
+//   });
+//if(textures[0]) { console.log('Texture loaded'); }else{console.log('Texture not loaded');}
+var materials = [
+    new THREE.MeshBasicMaterial({map: textures[0]}),
+    new THREE.MeshBasicMaterial({map: textures[1]}),
+    new THREE.MeshBasicMaterial({map: textures[2]}),
+    new THREE.MeshBasicMaterial({map: textures[0]}),
+    new THREE.MeshBasicMaterial({map: textures[1]}),
+    new THREE.MeshBasicMaterial({map: textures[2]})
+  ];
+  
+  var sampleGeometry = new THREE.BoxGeometry(198, 198, 198);
+   sampleCube = new THREE.Mesh(sampleGeometry, materials);
+  scene.add(sampleCube);
 
     // 视角控制器
     //创建一个用于显示小立方体的HTML元素，并将其添加到页面的适当位置。为了在右上角显示，并设置合适的top和right样式属性。
@@ -1345,6 +1372,7 @@ function createTextTexture(text) {
 
     return texture;
 }
+
 //初始化性能插件
 function initStats() {
     stats = new Stats();
