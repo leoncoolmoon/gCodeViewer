@@ -1136,7 +1136,7 @@ loader.setCrossOrigin('anonymous');
 var textures = [
   loader.load('alipay.jpg'),
   loader.load('paypal.jpg'),
-  loader.load('wechat.jpg')
+  loader.load('wechat.png')
 ];
 // var texture = loader.load('alipay.jpg', function(texture) {
 //     console.log('Texture loaded');
