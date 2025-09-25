@@ -19,30 +19,83 @@ var isASCII = false;
 var landscape = true;
 var cordinatesDiv = document.getElementById('cordinates');
 // 创建球体对象
-var cursor3D = new THREE.Group();
-cursor3D.name = "cursor";
-var cursor3DX = new THREE.Geometry();
-cursor3DX.vertices.push(new THREE.Vector3(-1, 0, 0));
-cursor3DX.vertices.push(new THREE.Vector3(1, 0, 0));
-cursor3D.add(new THREE.Line(cursor3DX, new THREE.LineBasicMaterial({ color: 0xff0000 })));
-var cursor3DY = new THREE.Geometry();
-cursor3DY.vertices.push(new THREE.Vector3(0, -1, 0));
-cursor3DY.vertices.push(new THREE.Vector3(0, 1, 0));
-cursor3D.add(new THREE.Line(cursor3DY, new THREE.LineBasicMaterial({ color: 0x00ff00 })));
-var cursor3DZ = new THREE.Geometry();
-cursor3DZ.vertices.push(new THREE.Vector3(0, 0, -1));
-cursor3DZ.vertices.push(new THREE.Vector3(0, 0, 1));
-cursor3D.add(new THREE.Line(cursor3DZ, new THREE.LineBasicMaterial({ color: 0x0000ff })));
-var cursor3DP = new THREE.Geometry();
-cursor3DP.vertices.push(new THREE.Vector3(0, 0, 0));
-cursor3D.add(new THREE.Points(cursor3DP, new THREE.PointsMaterial({
-    color: 0x009900,
-    size: 5,
-    alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
-    opacity: 0.75, // 设置透明度
-    sizeAttenuation: false, // 关闭点的大小衰减
-    transparent: true // 开启透明度
-})));
+// var cursor3D = new THREE.Group();
+// cursor3D.name = "cursor";
+// var cursor3DX = new THREE.Geometry();
+// cursor3DX.vertices.push(new THREE.Vector3(-1, 0, 0));
+// cursor3DX.vertices.push(new THREE.Vector3(1, 0, 0));
+// cursor3D.add(new THREE.Line(cursor3DX, new THREE.LineBasicMaterial({ color: 0xff0000 })));
+// var cursor3DY = new THREE.Geometry();
+// cursor3DY.vertices.push(new THREE.Vector3(0, -1, 0));
+// cursor3DY.vertices.push(new THREE.Vector3(0, 1, 0));
+// cursor3D.add(new THREE.Line(cursor3DY, new THREE.LineBasicMaterial({ color: 0x00ff00 })));
+// var cursor3DZ = new THREE.Geometry();
+// cursor3DZ.vertices.push(new THREE.Vector3(0, 0, -1));
+// cursor3DZ.vertices.push(new THREE.Vector3(0, 0, 1));
+// cursor3D.add(new THREE.Line(cursor3DZ, new THREE.LineBasicMaterial({ color: 0x0000ff })));
+// var cursor3DP = new THREE.Geometry();
+// cursor3DP.vertices.push(new THREE.Vector3(0, 0, 0));
+// cursor3D.add(new THREE.Points(cursor3DP, new THREE.PointsMaterial({
+//     color: 0x009900,
+//     size: 5,
+//     alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
+//     opacity: 0.75, // 设置透明度
+//     sizeAttenuation: false, // 关闭点的大小衰减
+//     transparent: true // 开启透明度
+// })));
+    var canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    var context = canvas.getContext('2d');
+    
+    // 绘制十字光标 - 改成亮黄色
+    context.strokeStyle = '#ffff00';
+    context.lineWidth = 3;
+    
+    // 左横线
+    context.beginPath();
+    context.moveTo(10, 32);
+    context.lineTo(28, 32);
+    context.stroke();
+    
+    // 右横线
+    context.beginPath();
+    context.moveTo(36, 32);
+    context.lineTo(54, 32);
+    context.stroke();
+    
+    // 上竖线
+    context.beginPath();
+    context.moveTo(32, 10);
+    context.lineTo(32, 28);
+    context.stroke();
+    
+    // 下竖线
+    context.beginPath();
+    context.moveTo(32, 36);
+    context.lineTo(32, 54);
+    context.stroke();
+    
+    // 中心圆形 - 镂空边框
+    context.strokeStyle = 'rgba(247, 113, 113, 1)';
+    context.lineWidth = 1;
+    context.beginPath();
+    context.arc(32, 32, 2, 0, 2 * Math.PI);
+    context.stroke();
+    
+    var cursorMap = new THREE.CanvasTexture(canvas);
+    var spriteMaterial = new THREE.SpriteMaterial({ 
+        map: cursorMap,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false,  // 关键：不受深度测试影响
+        depthWrite: false  // 关键：不写入深度缓冲区
+    });
+    
+    cursor3D = new THREE.Sprite(spriteMaterial);
+    cursor3D.name = "cursor";
+    cursor3D.scale.set(20, 20, 1); // 屏幕空间尺寸（像素）
+    cursor3D.visible = false;
 // 定义一个射线投射器
 var raycaster = new THREE.Raycaster();
 var mouse = new THREE.Vector2();
@@ -185,7 +238,7 @@ function updateCurrentLayerByLineNumber(lineNumber) {
 function findLayerByLineNumber(lineNumber) {
     var content = txar.getValue();
     var lines = content.split('\n');
-    
+
     // 向前查找最近的LAYER标记
     for (var i = lineNumber; i >= 0; i--) {
         var line = lines[i].trim();
@@ -797,7 +850,7 @@ function detectMachineTypeAndLayers(contents) {
     }
 
 
-        // 判断机器类型
+    // 判断机器类型
     if (features.hasLayerComments || (features.hasExtrusion && features.hasTemperature)) {
         machineType = '3DPRINT';
     } else {//if (features.hasSpindle || features.hasToolChanges) {
@@ -816,7 +869,7 @@ function createLayerProgressBar() {
     // 移除已存在的进度条
     var existingBar = document.getElementById('layer-progress-bar');
     if (existingBar) existingBar.remove();
-    
+
     var progressBar = document.createElement('div');
     progressBar.id = 'layer-progress-bar';
     progressBar.innerHTML = `
@@ -835,7 +888,7 @@ function createLayerProgressBar() {
             <div class="layer-label"></div>
         </div>
     `;
-    
+
     // 简化容器样式
     progressBar.style.cssText = `
         position: absolute;
@@ -856,20 +909,20 @@ function createLayerProgressBar() {
         align-items: center;
         justify-content: space-between;
     `;
-    
+
     // 头部样式
     progressBar.querySelector('.progress-header').style.cssText = `
         text-align: center;
         margin-bottom: 10px;
     `;
-    
+
     progressBar.querySelector('.current-layer').style.cssText = `
         font-size: 16px;
         font-weight: bold;
         color: white;
         margin-bottom: 4px;
     `;
-    
+
     // 轨道样式
     progressBar.querySelector('.progress-track').style.cssText = `
         position: relative;
@@ -880,7 +933,7 @@ function createLayerProgressBar() {
         cursor: pointer;
         margin: 10px 0;
     `;
-    
+
     // 白球样式 - 简化版
     progressBar.querySelector('.progress-thumb').style.cssText = `
         position: absolute;
@@ -896,7 +949,7 @@ function createLayerProgressBar() {
         align-items: center;
         justify-content: center;
     `;
-    
+
     // 黑字样式
     progressBar.querySelector('.thumb-label').style.cssText = `
         color: black;
@@ -904,55 +957,55 @@ function createLayerProgressBar() {
         font-weight: bold;
         text-shadow: none;
     `;
-    
+
     // 底部样式
     progressBar.querySelector('.progress-footer').style.cssText = `
         text-align: center;
         margin-top: 10px;
     `;
-    
+
     progressBar.querySelector('.total-layers').style.cssText = `
         font-size: 14px;
         font-weight: bold;
         color: white;
         margin-bottom: 4px;
     `;
-    
+
     // 标签样式
     var labels = progressBar.querySelectorAll('.layer-label');
-    labels.forEach(function(label) {
+    labels.forEach(function (label) {
         label.style.cssText = `
             font-size: 11px;
             opacity: 0.9;
             color: #ccc;
         `;
     });
-    
+
     // 简化的拖拽反馈
     var thumb = progressBar.querySelector('.progress-thumb');
-    thumb.addEventListener('mousedown', function() {
+    thumb.addEventListener('mousedown', function () {
         this.style.cursor = 'grabbing';
     });
-    
-    document.addEventListener('mouseup', function() {
+
+    document.addEventListener('mouseup', function () {
         thumb.style.cursor = 'grab';
     });
-    
+
     // 添加到3D视图容器
     var viewer = document.getElementById('3dViewer');
     viewer.appendChild(progressBar);
-    
+
     // 添加事件监听
     setupProgressBarEvents(progressBar);
     setupKeyboardAndWheelEvents();
-    
+
     return progressBar;
 }
 // 逐层导航
 function navigateLayers(direction) {
     var targetLayer = layerData.currentLayer + direction;
     targetLayer = Math.max(0, Math.min(layerData.totalLayers - 1, targetLayer));
-    
+
     if (targetLayer !== layerData.currentLayer) {
         jumpToLayer(targetLayer);
     }
@@ -960,42 +1013,42 @@ function navigateLayers(direction) {
 var isMouseOverProgressBar = false;
 // 修改键盘事件为 PageUp/PageDown
 function setupKeyboardAndWheelEvents() {
-        // 鼠标滚轮事件（在进度条上）
+    // 鼠标滚轮事件（在进度条上）
     var progressBar = document.getElementById('layer-progress-bar');
     if (!progressBar) return;
     if (progressBar) {
-        progressBar.addEventListener('wheel', function(e) {
+        progressBar.addEventListener('wheel', function (e) {
             if (machineType !== '3DPRINT') return;
-            
+
             e.preventDefault();
             var delta = e.deltaY > 0 ? 1 : -1;
             navigateLayers(delta);
         });
-        
+
         // 增加悬停效果
-        progressBar.addEventListener('mouseenter', function() {
-        isMouseOverProgressBar = true;
-        // 临时禁用Three.js键盘控制
-        if (controls) controls.enableKeys = false;
+        progressBar.addEventListener('mouseenter', function () {
+            isMouseOverProgressBar = true;
+            // 临时禁用Three.js键盘控制
+            if (controls) controls.enableKeys = false;
             this.style.background = 'rgba(0,0,0,0.95)';
             this.style.borderColor = '#888';
         });
-        
-        progressBar.addEventListener('mouseleave', function() {
-        isMouseOverProgressBar = false;
-        // 恢复Three.js键盘控制
-        if (controls) controls.enableKeys = true;
+
+        progressBar.addEventListener('mouseleave', function () {
+            isMouseOverProgressBar = false;
+            // 恢复Three.js键盘控制
+            if (controls) controls.enableKeys = true;
             this.style.background = 'rgba(0,0,0,0.85)';
             this.style.borderColor = '#666';
         });
     }
-// 键盘事件
-    document.addEventListener('keydown', function(e) {
-        if ( machineType !== '3DPRINT') return;
+    // 键盘事件
+    document.addEventListener('keydown', function (e) {
+        if (machineType !== '3DPRINT') return;
         // 如果鼠标在进度条上，优先响应进度条快捷键
         if (!isMouseOverProgressBar) return;
-            
-        switch(e.key) {
+
+        switch (e.key) {
             case 'PageUp':
                 e.preventDefault();
                 navigateLayers(-1); // 向上层
@@ -1014,7 +1067,7 @@ function setupKeyboardAndWheelEvents() {
                 break;
         }
     });
-    
+
 }
 
 // 更新进度条显示
@@ -1022,15 +1075,15 @@ function updateProgressBarDisplay() {
     var thumb = document.getElementById('layer-thumb');
     var thumbLabel = document.getElementById('thumb-label');
     var maxLabel = document.getElementById('max-label');
-    
+
     if (thumb && thumbLabel && maxLabel && layerData.totalLayers > 0) {
-        var percentage = layerData.totalLayers > 1 ? 
+        var percentage = layerData.totalLayers > 1 ?
             layerData.currentLayer / (layerData.totalLayers - 1) : 0;
-        
+
         thumb.style.top = (percentage * 100) + '%';
         thumbLabel.textContent = layerData.currentLayer;
         maxLabel.textContent = layerData.totalLayers;
-                // 添加动画效果
+        // 添加动画效果
         thumb.style.transition = 'top 0.2s ease';
         setTimeout(() => {
             thumb.style.transition = '';
@@ -1107,21 +1160,21 @@ function jumpToLayerByPercentage(percentage) {
 function jumpToLayer(layerNumber) {
     if (layerNumber < 0 || layerNumber >= layerData.totalLayers) return;
     if (layerNumber === layerData.currentLayer) return; // 已经是目标层
-    
+
     var content = txar.getValue();
     var lines = content.split('\n');
     var direction = layerNumber > layerData.currentLayer ? 1 : -1;
     var startLine = findLayerLineByNumber(layerNumber, lines, direction);
-    
+
     if (startLine !== -1) {
         // 跳转到该层开始位置
         txar.setCursor(startLine, 0);
         markLine(startLine, true);
         layerData.currentLayer = layerNumber;
-        
+
         // 更新进度条显示
         updateProgressBarDisplay();
-        
+
         console.log('跳转到层:', layerNumber, '行号:', startLine);
     }
 }
@@ -1130,7 +1183,7 @@ function jumpToLayer(layerNumber) {
 function findLayerLineByNumber(targetLayer, lines, direction) {
     var startLine = direction === 1 ? 0 : lines.length - 1;
     var endLine = direction === 1 ? lines.length - 1 : 0;
-    
+
     for (var i = startLine; direction === 1 ? i <= endLine : i >= endLine; i += direction) {
         var line = lines[i].trim();
         if (line.includes(';LAYER:')) {
@@ -1155,8 +1208,9 @@ function extractLayerNumber(line) {
     return match ? parseInt(match[1]) : -1;
 }
 
+function bt_cut(){
 
-
+}
 
 function bt_open() {
     //pop open file diaglog to open local file accept extension in plainTextFile and STL
@@ -1215,13 +1269,13 @@ function read_file(file) {
         var contents = event.target.result;
         var extension = getFileExtension(file.name);
         // 检测机器类型和层信息
-        machineType = detectMachineTypeAndLayers(contents, file.name);
-
+        machineType = detectMachineTypeAndLayers(contents);
         type = plainTextFile.includes(extension) ? "GCODE" : STL.includes(extension) ? "STL" : "UNKNOWN"
         // 如果是3D打印且检测到层信息，创建进度条
         if (machineType === '3DPRINT' && layerData.totalLayers > 0) {
             createLayerProgressBar();
             updateProgressBarDisplay();
+            adjustAxisFor3DPrint();
         }
         loadCode(contents, type, loadModle(contents, type));
     };
@@ -1274,6 +1328,17 @@ function bt_clear() {
     txar.setValue("");
     gCodeClear();
     sTlClear();
+    // 恢复参考网格位置
+    resetAxisPosition();
+
+    // 移除进度条
+    var progressBar = document.getElementById('layer-progress-bar');
+    if (progressBar) {
+        progressBar.remove();
+    }
+
+    // 重置机器类型
+    machineType = 'UNKNOWN';
 }
 function bt_regenerate() {
     var contents = txar.getValue();
@@ -1522,6 +1587,45 @@ function bt_simulate() {
         scene.add(prints);
     }
 }
+// 在全局变量中添加
+var originalAxisPositions = {
+    cube: null,
+    grid: null
+};
+
+function adjustAxisFor3DPrint() {
+    if (machineType === '3DPRINT') {
+        // 移动立方体框架：x+125, y+125
+        var cube = axises.getObjectByName("ViewerAxises").children[0]; // 第一个是立方体
+        var grid = axises.getObjectByName("ViewerAxises").children[1]; // 第二个是网格
+
+        if (cube) {
+            cube.position.x += 125;
+            cube.position.y += 125;
+        }
+        if (grid) {
+            grid.position.x += 125;
+            grid.position.y += 125;
+        }
+
+        console.log('3D打印模式：调整参考网格位置');
+    }
+}
+
+function resetAxisPosition() {
+    // 恢复原始位置
+    var cube = axises.getObjectByName("ViewerAxises").children[0];
+    var grid = axises.getObjectByName("ViewerAxises").children[1];
+
+    if (cube && originalAxisPositions.cube) {
+        cube.position.copy(originalAxisPositions.cube);
+    }
+    if (grid && originalAxisPositions.grid) {
+        grid.position.copy(originalAxisPositions.grid);
+    }
+
+    console.log('恢复参考网格到原始位置');
+}
 
 //add relative function end
 function init() {
@@ -1615,7 +1719,9 @@ function init() {
     // 将网格旋转90度，使其位于xy平面上
     gridHelper.rotation.x = Math.PI / 2;
     axises.add(gridHelper);
-
+    // 保存原始位置
+    originalAxisPositions.cube = cube.position.clone();
+    originalAxisPositions.grid = gridHelper.position.clone();
     // 创建X轴线
     var xAxisGeometry = new THREE.Geometry();
     xAxisGeometry.vertices.push(new THREE.Vector3(0, 0, 0));
@@ -2075,6 +2181,13 @@ function geometryToStlAscii(geometry) {
 
 function render() {
     requestAnimationFrame(render);
+    // 固定光标尺寸
+    if (cursor3D && cursor3D.visible) {
+        var distance = camera.position.distanceTo(cursor3D.position);
+        var scale = distance * 0.1; // 调整这个系数来控制大小
+        cursor3D.scale.set(scale, scale, 1);
+    }
+
     renderer.render(scene, camera);
     controls.update(); // 更新相机状态
     stats.update();//更新性能插件
