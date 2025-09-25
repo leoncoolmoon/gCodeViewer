@@ -1,3 +1,4 @@
+// TODO:温度不能正常获取
 function findLastPositions(lines, startLine) {
     let lastE = null, lastZ = null, lastX = null, lastY = null;
 
