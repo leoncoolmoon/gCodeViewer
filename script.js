@@ -18,6 +18,7 @@ var supressCube = false;
 var isASCII = false;
 var landscape = true;
 var cordinatesDiv = document.getElementById('cordinates');
+var nromalTitle = "STL Gcode Viewer";
 // 创建球体对象
 // var cursor3D = new THREE.Group();
 // cursor3D.name = "cursor";
@@ -43,59 +44,59 @@ var cordinatesDiv = document.getElementById('cordinates');
 //     sizeAttenuation: false, // 关闭点的大小衰减
 //     transparent: true // 开启透明度
 // })));
-    var canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    var context = canvas.getContext('2d');
-    
-    // 绘制十字光标 - 改成亮黄色
-    context.strokeStyle = '#ffff00';
-    context.lineWidth = 3;
-    
-    // 左横线
-    context.beginPath();
-    context.moveTo(10, 32);
-    context.lineTo(28, 32);
-    context.stroke();
-    
-    // 右横线
-    context.beginPath();
-    context.moveTo(36, 32);
-    context.lineTo(54, 32);
-    context.stroke();
-    
-    // 上竖线
-    context.beginPath();
-    context.moveTo(32, 10);
-    context.lineTo(32, 28);
-    context.stroke();
-    
-    // 下竖线
-    context.beginPath();
-    context.moveTo(32, 36);
-    context.lineTo(32, 54);
-    context.stroke();
-    
-    // 中心圆形 - 镂空边框
-    context.strokeStyle = 'rgba(247, 113, 113, 1)';
-    context.lineWidth = 1;
-    context.beginPath();
-    context.arc(32, 32, 2, 0, 2 * Math.PI);
-    context.stroke();
-    
-    var cursorMap = new THREE.CanvasTexture(canvas);
-    var spriteMaterial = new THREE.SpriteMaterial({ 
-        map: cursorMap,
-        transparent: true,
-        opacity: 0.8,
-        depthTest: false,  // 关键：不受深度测试影响
-        depthWrite: false  // 关键：不写入深度缓冲区
-    });
-    
-    cursor3D = new THREE.Sprite(spriteMaterial);
-    cursor3D.name = "cursor";
-    cursor3D.scale.set(20, 20, 1); // 屏幕空间尺寸（像素）
-    cursor3D.visible = false;
+var canvas = document.createElement('canvas');
+canvas.width = 64;
+canvas.height = 64;
+var context = canvas.getContext('2d');
+
+// 绘制十字光标 - 改成亮黄色
+context.strokeStyle = '#ffff00';
+context.lineWidth = 3;
+
+// 左横线
+context.beginPath();
+context.moveTo(10, 32);
+context.lineTo(28, 32);
+context.stroke();
+
+// 右横线
+context.beginPath();
+context.moveTo(36, 32);
+context.lineTo(54, 32);
+context.stroke();
+
+// 上竖线
+context.beginPath();
+context.moveTo(32, 10);
+context.lineTo(32, 28);
+context.stroke();
+
+// 下竖线
+context.beginPath();
+context.moveTo(32, 36);
+context.lineTo(32, 54);
+context.stroke();
+
+// 中心圆形 - 镂空边框
+context.strokeStyle = 'rgba(247, 113, 113, 1)';
+context.lineWidth = 1;
+context.beginPath();
+context.arc(32, 32, 4, 0, 2 * Math.PI);
+context.stroke();
+
+var cursorMap = new THREE.CanvasTexture(canvas);
+var spriteMaterial = new THREE.SpriteMaterial({
+    map: cursorMap,
+    transparent: true,
+    opacity: 0.8,
+    depthTest: false,  // 关键：不受深度测试影响
+    depthWrite: false  // 关键：不写入深度缓冲区
+});
+
+cursor3D = new THREE.Sprite(spriteMaterial);
+cursor3D.name = "cursor";
+cursor3D.scale.set(20, 20, 1); // 屏幕空间尺寸（像素）
+cursor3D.visible = false;
 // 定义一个射线投射器
 var raycaster = new THREE.Raycaster();
 var mouse = new THREE.Vector2();
@@ -1171,7 +1172,6 @@ function jumpToLayer(layerNumber) {
         txar.setCursor(startLine, 0);
         markLine(startLine, true);
         layerData.currentLayer = layerNumber;
-
         // 更新进度条显示
         updateProgressBarDisplay();
 
@@ -1207,10 +1207,40 @@ function extractLayerNumber(line) {
     var match = line.match(/;LAYER:(\d+)/);
     return match ? parseInt(match[1]) : -1;
 }
+const worker = new Worker('./worker.js');
+function bt_cut() {
+    if (machineType !== "3DPRINT") return;
+    if (document.title === nromalTitle) return;
+    var cutBt = document.getElementById("cuthere");
+    //disable cutBt after been used
+    cutBt.disabled = true;
+    cutBt.innerText = "processing...";
+    const cursorPos = txar.getCursor();
+    const text = txar.getValue();                // CodeMirror 文本
+    const cursorLine = txar.getCursor().line;    // 当前光标行
+    const title = document.title;                // 页面标题
 
-function bt_cut(){
-
+    // 发送给 worker
+    worker.postMessage({
+        text,
+        cursorLine,
+        title
+    });
 }
+// 接收处理结果并下载
+worker.onmessage = e => {
+    const { fileName, content } = e.data;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    var cutBt = document.getElementById("cuthere");
+    cutBt.innerText = "cut here";
+    cutBt.disabled = false;
+};
+
 
 function bt_open() {
     //pop open file diaglog to open local file accept extension in plainTextFile and STL
@@ -1248,6 +1278,7 @@ function read_file(file) {
         alert("file size is too big");
         return;
     }
+    document.title = file.name;
     scene.remove(sampleCube);
     if (gCode !== undefined) {
         gCodeClear();
