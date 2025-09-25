@@ -1226,21 +1226,35 @@ function bt_cut() {
         cursorLine,
         title
     });
+    // 接收处理结果并下载
+    worker.onmessage = e => {
+        const { type, error, fileName, content } = e.data;
+        switch (type) {
+            case 'success': {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName;
+                a.click();
+                console.log("cut done,", type, "saved as:", fileName);
+                doneCut();
+                break;
+            }
+            case 'error': {
+                console.log("cut failed,", type, "error msg:", error);
+                doneCut();
+                break;
+            }
+        }
+    };
 }
-// 接收处理结果并下载
-worker.onmessage = e => {
-    const { fileName, content } = e.data;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    var cutBt = document.getElementById("cuthere");
-    cutBt.innerText = "cut here";
-    cutBt.disabled = false;
-};
-
+function doneCut(){
+        var cutBt = document.getElementById("cuthere");
+        cutBt.innerText = "cut here";
+        cutBt.disabled = false;
+        worker.terminate();
+        URL.revokeObjectURL(blob.url); // 清理 blob
+}
 
 function bt_open() {
     //pop open file diaglog to open local file accept extension in plainTextFile and STL

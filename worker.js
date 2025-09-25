@@ -1,47 +1,66 @@
-// TODO:温度不能正常获取
-function findLastPositions(lines, startLine) {
-    let lastE = null, lastZ = null, lastX = null, lastY = null;
+function findLastPremeter(lines, startLine) {
+    let lastE = null, lastZ = null, lastX = null, lastY = null, lastL = null, nozzleTemp = null, bedTemp = null;
 
     // 从起始行向前倒着查找（保持您原来的逻辑）
-    for (let i = startLine - 2; i >= 0; i--) {
+    for (let i = startLine - 1; i >= 0; i--) {
+        // 如果所有值都找到就退出
+        if (lastE !== null && lastZ !== null && lastX !== null && lastY !== null && lastL !== null && nozzleTemp !== null && bedTemp !== null) {
+            break;
+        }
+
         const line = lines[i].trim();
 
-        if (!line || line.startsWith(';')) continue;
-
+        if (!line) continue;
+        //找层数
+        if (line.startsWith(';LAYER:') && lastL === null) {
+            lastL = line.replace(';LAYER:', "");
+            continue;
+        }
+        if (line.startsWith(';')) continue;
         // 只处理运动指令
         if (line.startsWith('G0') || line.startsWith('G1')) {
             if (line.includes('E') && lastE === null) {
-                const match = line.match(/E([-]?\d+\.\d+)/);
+                const match = line.match(/E([-]?\\d+\\.\\d+)/);///E([-]?\d+\.\d+)/);
                 if (match) lastE = match[1];
             }
 
             if (line.includes('Z') && lastZ === null) {
-                const match = line.match(/Z([-]?\d+\.\d+)/);
+                const match = line.match(/Z([-]?\\d+\\.\\d+)/);///Z([-]?\d+\.\d+)/);
                 if (match) lastZ = match[1];
             }
 
             if (line.includes('X') && lastX === null) {
-                const match = line.match(/X([-]?\d+\.\d+)/);
+                const match = line.match(/X([-]?\\d+\\.\\d+)/);///X([-]?\d+\.\d+)/);
                 if (match) lastX = match[1];
             }
 
             if (line.includes('Y') && lastY === null) {
-                const match = line.match(/Y([-]?\d+\.\d+)/);
+                const match = line.match(/Y([-]?\\d+\\.\\d+)/);///Y([-]?\d+\.\d+)/);
                 if (match) lastY = match[1];
             }
+            continue;
+        }
+        //提取温度
+        if ((line.startsWith('M104') || line.startsWith('M109')) && nozzleTemp === null) {
+            const match = line.match(/S(\\d+)/);///S(\d+)/);
+            if (match) nozzleTemp = match[1];
+            continue;
+        }
+        if ((line.startsWith('M140') || line.startsWith('M190')) && bedTemp === null) {
+            const match = line.match(/S(\\d+)/);///S(\d+)/);
+            if (match) bedTemp = match[1];
+            continue;
         }
 
-        // 如果所有值都找到就退出
-        if (lastE !== null && lastZ !== null && lastX !== null && lastY !== null) {
-            break;
-        }
     }
-
     return {
         e: lastE || "0.0",
         z: lastZ || "0.0",
         x: lastX || "0.0",
-        y: lastY || "0.0"
+        y: lastY || "0.0",
+        l: lastL || "0",
+        nT: nozzleTemp || "0",
+        bT: bedTemp || "0"
     };
 }
 function processGcodeInBackground(content, startLine, originalFilename) {
@@ -60,28 +79,26 @@ function processGcodeInBackground(content, startLine, originalFilename) {
             throw new Error("no header, cut failed")
         }
         // 查找最后一个有效位置
-        const lastPositions = findLastPositions(lines, startLine);
-
-        // 提取温度设置
-        const temperatures = extractTemperatures(lines);
+        const LastPremeter = findLastPremeter(lines, startLine);
 
         // 生成新的G代码
         const newGcode = generateNewGcode(
             lines,
             startLine,
             headerEndLine,
-            lastPositions,
-            temperatures
+            LastPremeter
         );
-
-        // 创建下载链接
-        downloadFile(newGcode, originalFilename, startLine);
-
-        showStatus(`文件切割完成！新文件从第 ${startLine} 行开始`, 'success');
-        progressBar.style.display = 'none';
+        // 将结果回传给主线程
+        self.postMessage({
+            type: 'success',
+            fileName: `${`${originalFilename}_resume_from_line_${startLine}.gcode` || 'output'}.gcode`,
+            content: newGcode
+        });
     } catch (e) {
-        showStatus(e, 'error');
-
+        self.postMessage({
+            type: 'error',
+            error: error.message
+        });
     }
 }
 function findHeaderEndLine(lines) {
@@ -93,45 +110,35 @@ function findHeaderEndLine(lines) {
     }
     return 0;
 }
-function extractTemperatures(lines) {
-    let nozzleTemp = "0";
-    let bedTemp = "0";
 
-    for (const line of lines) {
-        if (line.startsWith('M104')) {
-            const match = line.match(/S(\d+)/);
-            if (match) nozzleTemp = match[1];
-        }
-        if (line.startsWith('M190')) {
-            const match = line.match(/S(\d+)/);
-            if (match) bedTemp = match[1];
-        }
-    }
-
-    return { nozzleTemp, bedTemp };
-}
-function generateNewGcode(lines, startLine, headerEndLine, positions, temps) {
+function generateNewGcode(lines, startLine, headerEndLine, premeters) {
     let newContent = '';
 
     // 添加新的文件头
     newContent += `; Regenerated G code  - from line ${startLine} \n`;
     newContent += 'M117 start heating...\n';
-    newContent += `M104 S${temps.nozzleTemp} ; set\n`;
-    newContent += `M109 S${temps.nozzleTemp} ; wait nozzle temperature\n`;
+
+    if (premeters.bT !== "0") {
+        newContent += `M140 S${premeters.bT} ; set\n`;
+        newContent += `M190 S${premeters.bT} ; wait bed temperature\n`;
+    }
+
+    newContent += `M104 S${premeters.nT} ; set\n`;
+    newContent += `M109 S${premeters.nT} ; wait nozzle temperature\n`;
 
     newContent += 'M117 ready to print...\n';
     newContent += 'G28 X Y ; homing XY\n';
     newContent += 'G28 Z ; homing Z\n';
 
     // 移动到安全高度
-    const safeZ = parseFloat(positions.z) + 5.0;
+    const safeZ = parseFloat(premeters.z) + 5.0;
     newContent += `G0 Z${safeZ.toFixed(3)} F3000 ; move Z to safe height\n`;
 
     // 移动到最后位置
-    newContent += `G0 X${positions.x} Y${positions.y} F3000 ; move X Y to breakup point\n`;
+    newContent += `G0 X${premeters.x} Y${premeters.y} F3000 ; move X Y to breakup point\n`;
 
     // 设置挤出机位置
-    newContent += `G92 E${positions.e} ; set Excluder\n`;
+    newContent += `G92 E${premeters.e} ; set Extruder\n`;
     newContent += `M117 resume from ${startLine} ...\n\n`;
 
     // 添加从指定行开始的内容
@@ -141,22 +148,10 @@ function generateNewGcode(lines, startLine, headerEndLine, positions, temps) {
 
     return newContent;
 }
-function downloadFile(content, originalFilename, startLine) {
 
-    // 将结果回传给主线程
-    self.postMessage({
-        fileName: `${`${originalFilename}_resume_from_line_${startLine}.gcode` || 'output'}.gcode`,
-        content: content
-    });
-}
 
 // worker.js
 self.onmessage = e => {
     const { text, cursorLine, title } = e.data;
-
     processGcodeInBackground(text, cursorLine, title)
-    const processed =
-        `# Title: ${title}\n# Cursor Line: ${cursorLine}\n\n${text}`;
-    // =================================
-
 };
