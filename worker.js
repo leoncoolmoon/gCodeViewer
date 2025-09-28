@@ -85,7 +85,7 @@ function processGcodeInBackground(content, startLine, originalFilename) {
         // 将结果回传给主线程
         self.postMessage({
             type: 'success',
-            fileName: `${`${originalFilename}_resume_from_line_${startLine}.gcode` || 'output'}.gcode`,
+            fileName: `${`resume_${originalFilename.replace(".gcode","")}_from_line_${startLine}` || 'output'}.gcode`,
             content: newGcode
         });
     } catch (e) {
