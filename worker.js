@@ -125,7 +125,7 @@ function generateNewGcode(lines, startLine, premeters) {
     // 设置挤出机位置
     newContent += `G92 E${premeters.e} ; set Extruder\n`;
     newContent += `M117 resume from ${startLine} ...\n\n`;
-
+    newContent += `G0 Z${premeters.z} F3000 ; move Z to safe height\n`;
     // 添加从指定行开始的内容
     for (let i = startLine - 1; i < lines.length; i++) {
         newContent += lines[i] + '\n';
