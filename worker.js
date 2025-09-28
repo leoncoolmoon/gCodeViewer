@@ -113,6 +113,7 @@ function generateNewGcode(lines, startLine, premeters) {
     newContent += 'G92 Z0 ; reset Z\n';
     newContent += 'G1 Z10 ; unstuck Z\n';
     newContent += 'G28 X0 Y0 ; homing XY\n';
+    newContent += 'G1 Z0 ; moveback Z\n';
     newContent += 'G28 Z0 ; homing Z\n';
     newContent += `G92 E0 ;zero the extruded length\n`;
     newContent += `G1 F200 E10 ;extrude 10mm of feed stock\n`;

@@ -1187,7 +1187,12 @@ function extractLayerNumber(line) {
     var match = line.match(/;LAYER:(\d+)/);
     return match ? parseInt(match[1]) : -1;
 }
-const worker = new Worker('./worker.js');
+const worker = null;
+try{worker = new Worker('./worker.js');}
+catch(e){
+console.log("unable to load ./worker.js");
+document.getElementById("cuthere").disabled=true;
+}
 function bt_jump() {
     if (txar.lineCount() <= 1) {
         //console.log(txar.lineCount());
@@ -1238,9 +1243,10 @@ function bt_jump() {
         try {
             txar.setCursor(parseInt(input.value) - 1, 0, { scroll: true }); // 注意：行号从0开始计算
             txar.focus();
-            var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
-            var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
-            mark = txar.markText(start, end, { className: "highlighted-line" });
+            // var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
+            // var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
+            // mark = txar.markText(start, end, { className: "highlighted-line" });
+            markLine(parseInt(input.value)-1,false);
         } catch (e) {
             console.log(e);
         }
@@ -1332,9 +1338,11 @@ function bt_cut() {
         document.body.removeChild(overlay);
         txar.setCursor(parseInt(input.value) - 1, 0, { scroll: true }); // 注意：行号从0开始计算
         txar.focus();
-        var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
-        var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
-        mark = txar.markText(start, end, { className: "highlighted-line" });
+        // var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
+        // var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
+        // mark = txar.markText(start, end, { className: "highlighted-line" });
+        markLine(parseInt(input.value)-1,false);
+
     };
     // 创建取消按钮
     const cancelBtn = document.createElement('button');
@@ -1671,9 +1679,9 @@ var gcodeTimer = {
             var currentTime = Date.now();
             this.elapsedTime += currentTime - this.startTime;
             this.startTime = currentTime;
-            console.log("Elapsed time: " + this.elapsedTime + " ms");
             var cursor = txar.getCursor();
             var lineNumber = cursor.line;
+            console.log("Elapsed time: " + this.elapsedTime + " ms\n line number:"+ lineNumber);
             if (direction == 1 && lineNumber < txar.lineCount() - 1) {
                 markLine(lineNumber + direction, true);
             } else if (direction == -1 && lineNumber > 0) {
@@ -1703,11 +1711,11 @@ function play_pause() {
     back_pause.innerHTML = "back";
     if (play_pause.innerHTML === "play") {
         play_pause.innerHTML = "pause";
-        direction = 1;
-        gcodeTimer.start();
+        gcodeTimer.pause();
     } else {
         play_pause.innerHTML = "play";
-        gcodeTimer.pause();
+        direction = 1;
+        gcodeTimer.start();
     }
     //pause play
     //stop timer
@@ -1721,11 +1729,11 @@ function back_pause() {
     play_pause.innerHTML = "play";
     if (back_pause.innerHTML === "back") {
         back_pause.innerHTML = "pause";
-        direction = -1;
-        gcodeTimer.start();
+        gcodeTimer.pause();
     } else {
         back_pause.innerHTML = "back";
-        gcodeTimer.pause();
+        direction = -1;
+        gcodeTimer.start();
     }
     //pause back
     //stop timer
