@@ -19,31 +19,11 @@ var isASCII = false;
 var landscape = true;
 var cordinatesDiv = document.getElementById('cordinates');
 var nromalTitle = "STL Gcode Viewer";
-// 创建球体对象
-// var cursor3D = new THREE.Group();
-// cursor3D.name = "cursor";
-// var cursor3DX = new THREE.Geometry();
-// cursor3DX.vertices.push(new THREE.Vector3(-1, 0, 0));
-// cursor3DX.vertices.push(new THREE.Vector3(1, 0, 0));
-// cursor3D.add(new THREE.Line(cursor3DX, new THREE.LineBasicMaterial({ color: 0xff0000 })));
-// var cursor3DY = new THREE.Geometry();
-// cursor3DY.vertices.push(new THREE.Vector3(0, -1, 0));
-// cursor3DY.vertices.push(new THREE.Vector3(0, 1, 0));
-// cursor3D.add(new THREE.Line(cursor3DY, new THREE.LineBasicMaterial({ color: 0x00ff00 })));
-// var cursor3DZ = new THREE.Geometry();
-// cursor3DZ.vertices.push(new THREE.Vector3(0, 0, -1));
-// cursor3DZ.vertices.push(new THREE.Vector3(0, 0, 1));
-// cursor3D.add(new THREE.Line(cursor3DZ, new THREE.LineBasicMaterial({ color: 0x0000ff })));
-// var cursor3DP = new THREE.Geometry();
-// cursor3DP.vertices.push(new THREE.Vector3(0, 0, 0));
-// cursor3D.add(new THREE.Points(cursor3DP, new THREE.PointsMaterial({
-//     color: 0x009900,
-//     size: 5,
-//     alphaTest: 0.5, // 设置透明度阈值，控制圆形的边缘
-//     opacity: 0.75, // 设置透明度
-//     sizeAttenuation: false, // 关闭点的大小衰减
-//     transparent: true // 开启透明度
-// })));
+// 在全局变量中添加
+var originalAxisPositions = {
+    cube: null,
+    grid: null
+};
 var canvas = document.createElement('canvas');
 canvas.width = 64;
 canvas.height = 64;
@@ -1208,7 +1188,189 @@ function extractLayerNumber(line) {
     return match ? parseInt(match[1]) : -1;
 }
 const worker = new Worker('./worker.js');
+function bt_jump() {
+    if (txar.lineCount() <= 1) {
+        //console.log(txar.lineCount());
+        return;
+    }
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = function(e) {
+        e.stopPropagation();
+    };
+    // 创建对话框容器
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        position: fixed; 
+        top: 50%; 
+        left: 50%; 
+        transform: translate(-50%, -50%); 
+        background: white; 
+        padding: 20px; 
+        border: 1px solid #ccc;
+        z-index: 1000;
+    `;
+    // 创建文本标签
+    const label = document.createElement('label');
+    label.textContent = 'Jump to: ';
+    label.style.marginRight = '10px';
+
+    // 创建输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Line Number';
+    input.style.marginLeft = '10px';
+
+    // 创建确认按钮
+    const button = document.createElement('button');
+    button.textContent = 'Confirm';
+    button.style.marginLeft = '10px';
+    button.onclick = function () {
+        try {
+            txar.setCursor(parseInt(input.value) - 1, 0, { scroll: true }); // 注意：行号从0开始计算
+            txar.focus();
+            var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
+            var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
+            mark = txar.markText(start, end, { className: "highlighted-line" });
+        } catch (e) {
+            console.log(e);
+        }
+
+        document.body.removeChild(dialog);
+        document.body.removeChild(overlay);
+    };
+    // 创建取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.marginLeft = '10px';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function () {
+        document.body.removeChild(dialog);
+        document.body.removeChild(overlay);
+        txar.focus();
+    };
+    // 添加到对话框
+    dialog, innerText = " Cut from line:"
+    dialog.appendChild(label);
+    dialog.appendChild(input);
+    dialog.appendChild(button);
+    dialog.appendChild(cancelBtn);
+    // ESC按键处理
+    const handleKeydown = function (e) {
+        if (e.key === 'Escape') {
+            dialog.removeEventListener('keydown', handleKeydown);
+            document.body.removeChild(dialog);
+            document.body.removeChild(overlay);
+        }
+    };
+    // 添加到页面
+    dialog.addEventListener('keydown', handleKeydown)
+
+    // 添加到页面
+    document.body.appendChild(dialog);
+    dialog.onclick = function(e) {
+        e.stopPropagation();
+    };
+    input.focus();
+
+}
 function bt_cut() {
+    if (txar.lineCount() <= 1) { return; }
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = function(e) {
+        e.stopPropagation();
+    };
+    // 创建对话框容器
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        position: fixed; 
+        top: 50%; 
+        left: 50%; 
+        transform: translate(-50%, -50%); 
+        background: white; 
+        padding: 20px; 
+        border: 1px solid #ccc;
+        z-index: 1000;
+    `;
+    // 创建文本标签
+    const label = document.createElement('label');
+    label.textContent = 'Cut from: ';
+    label.style.marginRight = '10px';
+
+    // 创建输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Line Number';
+    input.style.marginLeft = '10px';
+    input.value = txar.getCursor().line + 1;
+
+    // 创建确认按钮
+    const button = document.createElement('button');
+    button.textContent = 'Confirm';
+    button.style.marginLeft = '10px';
+    button.onclick = function () {
+        cuthere(parseInt(input.value) - 1);
+        document.body.removeChild(dialog);
+        document.body.removeChild(overlay);
+        txar.setCursor(parseInt(input.value) - 1, 0, { scroll: true }); // 注意：行号从0开始计算
+        txar.focus();
+        var start = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value) - 1, ch: 0 })); // 行的起始位置
+        var end = txar.posFromIndex(txar.indexFromPos({ line: parseInt(input.value), ch: 0 })); // 行的结束位置
+        mark = txar.markText(start, end, { className: "highlighted-line" });
+    };
+    // 创建取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.marginLeft = '10px';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function () {
+        document.body.removeChild(dialog);
+        document.body.removeChild(overlay);
+        txar.focus();
+    };
+    // 添加到对话框
+    dialog, innerText = " Cut from line:"
+    dialog.appendChild(label);
+    dialog.appendChild(input);
+    dialog.appendChild(button);
+    dialog.appendChild(cancelBtn);
+    // ESC按键处理
+    const handleKeydown = function (e) {
+        if (e.key === 'Escape') {
+            dialog.removeEventListener('keydown', handleKeydown);
+            document.body.removeChild(overlay);
+            document.body.removeChild(dialog);
+        }
+    };
+    // 添加到页面
+    dialog.addEventListener('keydown', handleKeydown)
+
+    // 添加到页面
+    document.body.appendChild(dialog);
+    dialog.onclick = function(e) {
+        e.stopPropagation();
+    };
+    input.focus();
+}
+function cuthere(iptLine) {
+    if(!worker) return;
     if (machineType !== "3DPRINT") return;
     if (document.title === nromalTitle) return;
     var cutBt = document.getElementById("cuthere");
@@ -1219,7 +1381,7 @@ function bt_cut() {
     const text = txar.getValue();                // CodeMirror 文本
     const cursorLine = txar.getCursor().line;    // 当前光标行
     const title = document.title;                // 页面标题
-
+    if (iptLine > txar.lineCount()) { return; }
     // 发送给 worker
     worker.postMessage({
         text,
@@ -1248,12 +1410,12 @@ function bt_cut() {
         }
     };
 }
-function doneCut(){
-        var cutBt = document.getElementById("cuthere");
-        cutBt.innerText = "cut here";
-        cutBt.disabled = false;
-        worker.terminate();
-        URL.revokeObjectURL(blob.url); // 清理 blob
+function doneCut() {
+    var cutBt = document.getElementById("cuthere");
+    cutBt.innerText = "cut here";
+    cutBt.disabled = false;
+    worker.terminate();
+    URL.revokeObjectURL(blob.url); // 清理 blob
 }
 
 function bt_open() {
@@ -1632,11 +1794,6 @@ function bt_simulate() {
         scene.add(prints);
     }
 }
-// 在全局变量中添加
-var originalAxisPositions = {
-    cube: null,
-    grid: null
-};
 
 function adjustAxisFor3DPrint() {
     if (machineType === '3DPRINT') {
@@ -1653,7 +1810,7 @@ function adjustAxisFor3DPrint() {
             grid.position.y += 125;
         }
 
-        console.log('3D打印模式：调整参考网格位置');
+        console.log('3D打印模式:调整参考网格位置');
     }
 }
 
@@ -1734,7 +1891,6 @@ function init() {
     v = document.getElementById('3dViewer');
     v.style.position = 'absolute';
     v.style.left = '0px';
-
     v.appendChild(renderer.domElement);
     // 添加环境光和点光
     var ambientLight = new THREE.AmbientLight(0xffffff);
@@ -1750,14 +1906,9 @@ function init() {
     var cubeGeometry = new THREE.BoxGeometry(250, 250, 250);
     var edges = new THREE.EdgesGeometry(cubeGeometry);
     var cubeMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
-    var cube = new THREE.LineSegments(edges, cubeMaterial);
-    cube.position.set(0, 0, 125);
-    axises.add(cube);
-
-    // var planeMaterial = new THREE.MeshBasicMaterial({ color: 0x888822, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
-    // var planeGeometry = new THREE.PlaneGeometry(250, 250);
-    // var plane = new THREE.Mesh(planeGeometry, planeMaterial);
-    // axises.add(plane);
+    var cubef = new THREE.LineSegments(edges, cubeMaterial);
+    cubef.position.set(0, 0, 125);
+    axises.add(cubef);
     var size = 250;
     var divisions = 25;
     var gridHelper = new THREE.GridHelper(size, divisions);
@@ -1765,7 +1916,7 @@ function init() {
     gridHelper.rotation.x = Math.PI / 2;
     axises.add(gridHelper);
     // 保存原始位置
-    originalAxisPositions.cube = cube.position.clone();
+    originalAxisPositions.cube = cubef.position.clone();
     originalAxisPositions.grid = gridHelper.position.clone();
     // 创建X轴线
     var xAxisGeometry = new THREE.Geometry();
@@ -2093,13 +2244,6 @@ function loadModle(contents, type) {
     if (type == "GCODE") {
         gCode = parseGcode(contents, 0, 0, 0, 0, 0, "G0");
 
-
-        // var g0Material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.75, transparent: true });
-        // var g1Material = new THREE.LineBasicMaterial({ color: 0x64ff64, opacity: 0.5, transparent: true });
-        // gCode.children[0].material = g0Material;
-        // gCode.children[1].material = g1Material;
-        //add points
-        //var pMaterial = new THREE.PointsMaterial({ color: 0x000099, size: 1 });
         var pMaterial = new THREE.PointsMaterial({
             color: 0x000099,
             size: 5,
@@ -2125,9 +2269,6 @@ function loadModle(contents, type) {
         gCode.add(point0);
         gCode.add(point1);
         var boundingBox = new THREE.Box3().setFromObject(gCode);
-        //var material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
-        //var material = new THREE.MeshPhongMaterial({ color: 0x64ff00, opacity: 0.15, transparent: true ,side: THREE.DoubleSide });
-        //var box = new THREE.Mesh(new THREE.BoxGeometry(boundingBox.max.x - boundingBox.min.x, boundingBox.max.y - boundingBox.min.y, boundingBox.max.z - boundingBox.min.z), material);
         var material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
         var box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(boundingBox.max.x - boundingBox.min.x, boundingBox.max.y - boundingBox.min.y, boundingBox.max.z - boundingBox.min.z)), material);
         box.position.set((boundingBox.max.x + boundingBox.min.x) / 2, (boundingBox.max.y + boundingBox.min.y) / 2, (boundingBox.max.z + boundingBox.min.z) / 2);
@@ -2392,7 +2533,3 @@ function calculatePoint3(movePoint, followPoint) {
     var direction = new THREE.Vector3().subVectors(movePoint, new THREE.Vector3(0, 0, 0)).normalize();
     return newPoint1 = direction.clone().multiplyScalar(distance);
 }
-
-
-
-
