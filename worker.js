@@ -101,7 +101,7 @@ function generateNewGcode(lines, startLine, premeters) {
 
     // 添加新的文件头
     newContent += `; Regenerated G code  - from line ${startLine} \n`;
-    newContent += 'M117 start heating...\n';
+    newContent += 'M117 restart heating...\n';
 
     if (premeters.bT !== "0") {
         newContent += `M140 S${premeters.bT} ; set\n`;
@@ -110,22 +110,23 @@ function generateNewGcode(lines, startLine, premeters) {
 
     newContent += `M104 S${premeters.nT} ; set\n`;
     newContent += `M109 S${premeters.nT} ; wait nozzle temperature\n`;
-
-    newContent += 'M117 ready to print...\n';
+    newContent += 'G92 Z0 ; reset Z\n';
+    newContent += 'G1 Z10 ; unstuck Z\n';
     newContent += 'G28 X0 Y0 ; homing XY\n';
     newContent += 'G28 Z0 ; homing Z\n';
-
+    newContent += `G92 E0 ;zero the extruded length\n`;
+    newContent += `G1 F200 E10 ;extrude 10mm of feed stock\n`;
+    newContent += 'M117 ready to print...\n';
     // 移动到安全高度
     const safeZ = parseFloat(premeters.z) + 5.0;
     newContent += `G0 Z${safeZ.toFixed(3)} F3000 ; move Z to safe height\n`;
-
     // 移动到最后位置
     newContent += `G0 X${premeters.x} Y${premeters.y} F3000 ; move X Y to breakup point\n`;
 
     // 设置挤出机位置
     newContent += `G92 E${premeters.e} ; set Extruder\n`;
-    newContent += `M117 resume from ${startLine} ...\n\n`;
-    newContent += `G0 Z${premeters.z} F3000 ; move Z to safe height\n`;
+    newContent += `M117 resume from ${startLine} ...\n`;
+    newContent += `G0 Z${premeters.z} F3000 ; move Z to breakup point\n`;
     // 添加从指定行开始的内容
     for (let i = startLine - 1; i < lines.length; i++) {
         newContent += lines[i] + '\n';
